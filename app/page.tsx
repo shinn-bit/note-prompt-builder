@@ -64,34 +64,223 @@ function statusHint(status: number): string {
     : "";
 }
 
-export default function Home() {
+function Chip({
+  label,
+  active,
+  onClick,
+}: {
+  label: string;
+  active: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      style={{
+        padding: "8px 10px",
+        borderRadius: 999,
+        border: "1px solid " + (active ? "#2563eb" : "#d1d5db"),
+        background: active ? "#eff6ff" : "white",
+        color: active ? "#1d4ed8" : "#111827",
+        cursor: "pointer",
+        fontSize: 13,
+      }}
+    >
+      {label}
+    </button>
+  );
+}
+
+function BulletListInput({
+  label,
+  value,
+  onChange,
+  placeholder,
+  requiredAtLeastOne,
+}: {
+  label: string;
+  value: string[];
+  onChange: (next: string[]) => void;
+  placeholder?: string;
+  requiredAtLeastOne?: boolean;
+}) {
+  const setAt = (idx: number, v: string) => {
+    const next = value.slice();
+    next[idx] = v;
+    onChange(next);
+  };
+
+  const add = () => onChange([...value, ""]);
+  const remove = (idx: number) => onChange(value.filter((_, i) => i !== idx));
+
+  const nonEmptyCount = value.filter((x) => x.trim()).length;
+  const showWarn = !!requiredAtLeastOne && nonEmptyCount === 0;
+
+  return (
+    <div>
+      <div style={{ display: "flex", gap: 10, alignItems: "baseline" }}>
+        <label style={{ fontWeight: 600 }}>{label}</label>
+        {requiredAtLeastOne && (
+          <span style={{ fontSize: 12, opacity: 0.7 }}>（最低1つ）</span>
+        )}
+        {showWarn && (
+          <span style={{ fontSize: 12, color: "#b91c1c" }}>入力が必要</span>
+        )}
+        <button
+          type="button"
+          onClick={add}
+          style={{
+            marginLeft: "auto",
+            padding: "8px 10px",
+            borderRadius: 10,
+            border: "1px solid #d1d5db",
+            background: "white",
+            cursor: "pointer",
+            fontSize: 13,
+          }}
+        >
+          + 追加
+        </button>
+      </div>
+
+      <div style={{ display: "grid", gap: 10, marginTop: 8 }}>
+        {value.map((line, idx) => (
+          <div key={idx} style={{ display: "flex", gap: 10 }}>
+            <input
+              style={{ ...inputStyle, marginTop: 0 }}
+              value={line}
+              onChange={(e) => setAt(idx, e.target.value)}
+              placeholder={placeholder}
+            />
+            <button
+              type="button"
+              onClick={() => remove(idx)}
+              style={{
+                padding: "0 12px",
+                borderRadius: 10,
+                border: "1px solid #d1d5db",
+                background: "white",
+                cursor: "pointer",
+                fontSize: 13,
+                height: 44,
+                marginTop: 6,
+              }}
+              title="削除"
+            >
+              ×
+            </button>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function DetailsRow({
+  label,
+  value,
+  onChange,
+  placeholder,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+}) {
+  return (
+    <div>
+      <label>{label}</label>
+      <input
+        style={inputStyle}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+      />
+    </div>
+  );
+}
+
+type ArticleType = "problem" | "experience" | "experiment";
+
+type PrimaryGoalSlug =
+  | "action"
+  | "collect_feedback"
+  | "build_trust"
+  | "lead_paid"
+  | "fan_build";
+
+const PRIMARY_GOALS: { slug: PrimaryGoalSlug; label: string }[] = [
+  { slug: "action", label: "行動してもらう" },
+  { slug: "collect_feedback", label: "感想/改善案を集める" },
+  { slug: "build_trust", label: "信頼を作る" },
+  { slug: "lead_paid", label: "有料/商品へ誘導" },
+  { slug: "fan_build", label: "ファン化" },
+];
+
+const TARGET_TAGS = [
+  "note初心者",
+  "副業初心者",
+  "収益化したい人",
+  "継続できない人",
+  "AI活用したい人",
+  "個人開発者",
+  "学生",
+];
+
+export default function HomePage() {
+  const [deviceId, setDeviceId] = useState("");
+  const apiBase = useMemo(() => process.env.NEXT_PUBLIC_API_BASE ?? "", []);
+
   const [theme, setTheme] = useState("");
-  const [target, setTarget] = useState("");
-  const [goal, setGoal] = useState("");
+  const [articleType, setArticleType] = useState<ArticleType>("problem");
+  const [primaryGoal, setPrimaryGoal] = useState<PrimaryGoalSlug>("action");
+
+  const [targetTags, setTargetTags] = useState<string[]>([]);
+  const [targetDetail, setTargetDetail] = useState("");
+
+  const [authority, setAuthority] = useState("");
   const [stylePreset, setStylePreset] = useState("casual");
 
-  const [conclusion, setConclusion] = useState("");
-  const [structurePlan, setStructurePlan] = useState("");
-  const [authority, setAuthority] = useState("");
-  const [episodes, setEpisodes] = useState("");
-  const [keywordsText, setKeywordsText] = useState("");
-  const [referenceLinksText, setReferenceLinksText] = useState("");
-  const [lengthPreset, setLengthPreset] = useState("medium");
-  const [ngRules, setNgRules] = useState("");
+  const [pProblem, setPProblem] = useState<string[]>([""]);
+  const [pEpisode, setPEpisode] = useState<string[]>([""]);
+  const [pCause, setPCause] = useState<string[]>([""]);
+  const [pSolutions, setPSolutions] = useState<string[]>([""]);
+  const [pTodayAction, setPTodayAction] = useState("");
 
-  const [deviceId, setDeviceId] = useState("");
+  const [optEvidence, setOptEvidence] = useState<string[]>([""]);
+  const [optFailures, setOptFailures] = useState<string[]>([""]);
+  const [showOptional, setShowOptional] = useState(false);
+
+  const [eEvent, setEEvent] = useState<string[]>([""]);
+  const [eFeelings, setEFeelings] = useState<string[]>([""]);
+  const [eInsight, setEInsight] = useState<string[]>([""]);
+  const [eLearnings, setELearnings] = useState<string[]>([""]);
+  const [eQuestion, setEQuestion] = useState("");
+  const [eMessage, setEMessage] = useState("");
+
+  const [optData, setOptData] = useState<string[]>([""]);
+  const [optFailureDetails, setOptFailureDetails] = useState<string[]>([""]);
+  const [optBackground, setOptBackground] = useState<string[]>([""]);
+
+  const [xHypothesis, setXHypothesis] = useState("");
+  const [xDid, setXDid] = useState<string[]>([""]);
+  const [xResult, setXResult] = useState<string[]>([""]);
+  const [xDiscussion, setXDiscussion] = useState<string[]>([""]);
+  const [xNextAction, setXNextAction] = useState<string[]>([""]);
+
+  const [optCompare, setOptCompare] = useState<string[]>([""]);
+  const [optUnexpected, setOptUnexpected] = useState<string[]>([""]);
+  const [optXFailures, setOptXFailures] = useState<string[]>([""]);
+
   const [generatedPrompt, setGeneratedPrompt] = useState("");
-
-  // ✅ generate結果の履歴ID（上書き保存に必要）
   const [historyId, setHistoryId] = useState<string>("");
 
-  // ✅ UX states
-  const [loading, setLoading] = useState(false); // generate中
-  const [saving, setSaving] = useState(false); // 上書き保存中
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
 
-  // ✅ edit mode
   const [isEditing, setIsEditing] = useState(false);
   const [dirty, setDirty] = useState(false);
 
@@ -99,15 +288,124 @@ export default function Home() {
     setDeviceId(getOrCreateDeviceId());
   }, []);
 
-  const apiBase = useMemo(() => process.env.NEXT_PUBLIC_API_BASE ?? "", []);
-
   const formLocked = loading || saving;
 
-  const canGenerate =
-    !formLocked && theme.trim() && target.trim() && goal.trim();
+  const hasAtLeastOne = (arr: string[]) => arr.some((x) => x.trim().length > 0);
+
+  const canGenerate = (() => {
+    if (formLocked) return false;
+    if (!theme.trim()) return false;
+    if (!articleType) return false;
+    if (!primaryGoal) return false;
+    if (!stylePreset) return false;
+
+    if (articleType === "problem") {
+      if (!hasAtLeastOne(pProblem)) return false;
+      if (!hasAtLeastOne(pEpisode)) return false;
+      if (!hasAtLeastOne(pSolutions)) return false;
+      if (!pTodayAction.trim()) return false;
+      return true;
+    }
+    if (articleType === "experience") {
+      if (!hasAtLeastOne(eEvent)) return false;
+      if (!hasAtLeastOne(eFeelings)) return false;
+      if (!hasAtLeastOne(eInsight)) return false;
+      if (!hasAtLeastOne(eLearnings)) return false;
+      if (!eQuestion.trim()) return false;
+      if (!eMessage.trim()) return false;
+      return true;
+    }
+    if (articleType === "experiment") {
+      if (!xHypothesis.trim()) return false;
+      if (!hasAtLeastOne(xDid)) return false;
+      if (!hasAtLeastOne(xResult)) return false;
+      if (!hasAtLeastOne(xDiscussion)) return false;
+      if (!hasAtLeastOne(xNextAction)) return false;
+      return true;
+    }
+    return false;
+  })();
 
   const canSave =
     !formLocked && !!historyId && !!generatedPrompt.trim() && isEditing && dirty;
+
+  const toggleTag = (tag: string) => {
+    setTargetTags((prev) =>
+      prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]
+    );
+  };
+
+  const buildPayloadV10 = () => {
+    const base: any = {
+      theme,
+      articleType,
+      primaryGoal,
+      targets: {
+        tags: targetTags,
+        detail: targetDetail.trim(),
+      },
+      authority: authority.trim(),
+      stylePreset,
+      meta: {
+        deviceId,
+        templateId: "note-v10",
+        version: "0.2.0",
+      },
+    };
+
+    if (articleType === "problem") {
+      base.materials = {
+        problem: {
+          problem: pProblem.filter((x) => x.trim()),
+          episode: pEpisode.filter((x) => x.trim()),
+          cause: pCause.filter((x) => x.trim()),
+          solutions: pSolutions.filter((x) => x.trim()),
+          todayAction: pTodayAction.trim(),
+        },
+      };
+      base.optional = {
+        evidence: optEvidence.filter((x) => x.trim()),
+        failures: optFailures.filter((x) => x.trim()),
+      };
+    }
+
+    if (articleType === "experience") {
+      base.materials = {
+        experience: {
+          event: eEvent.filter((x) => x.trim()),
+          feelingsOrSituation: eFeelings.filter((x) => x.trim()),
+          insight: eInsight.filter((x) => x.trim()),
+          learnings: eLearnings.filter((x) => x.trim()),
+          question: eQuestion.trim(),
+          message: eMessage.trim(),
+        },
+      };
+      base.optional = {
+        data: optData.filter((x) => x.trim()),
+        failureDetails: optFailureDetails.filter((x) => x.trim()),
+        background: optBackground.filter((x) => x.trim()),
+      };
+    }
+
+    if (articleType === "experiment") {
+      base.materials = {
+        experiment: {
+          hypothesis: xHypothesis.trim(),
+          did: xDid.filter((x) => x.trim()),
+          result: xResult.filter((x) => x.trim()),
+          discussion: xDiscussion.filter((x) => x.trim()),
+          nextAction: xNextAction.filter((x) => x.trim()),
+        },
+      };
+      base.optional = {
+        compare: optCompare.filter((x) => x.trim()),
+        failures: optXFailures.filter((x) => x.trim()),
+        unexpected: optUnexpected.filter((x) => x.trim()),
+      };
+    }
+
+    return base;
+  };
 
   const handleGenerate = async () => {
     setLoading(true);
@@ -115,8 +413,6 @@ export default function Home() {
     setNotice("");
     setIsEditing(false);
     setDirty(false);
-
-    // 生成開始時点では結果を一旦空に（スケルトン表示にする）
     setGeneratedPrompt("");
     setHistoryId("");
 
@@ -124,40 +420,12 @@ export default function Home() {
       if (!apiBase) throw new Error("NEXT_PUBLIC_API_BASE is not set");
       if (!deviceId) throw new Error("deviceId is not ready");
 
-      const keywords = keywordsText
-        .split(",")
-        .map((k) => k.trim())
-        .filter(Boolean)
-        .slice(0, 10);
-
-      const referenceLinks = referenceLinksText
-        .split(",")
-        .map((k) => k.trim())
-        .filter(Boolean)
-        .slice(0, 10);
+      const payload = buildPayloadV10();
 
       const res = await fetch(`${apiBase}/generate`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          theme,
-          target,
-          goal,
-          conclusion,
-          authority,
-          structurePlan,
-          episodes,
-          keywords,
-          referenceLinks,
-          stylePreset,
-          lengthPreset,
-          ngRules,
-          meta: {
-            deviceId,
-            templateId: "note-v9.0",
-            version: "0.1.0",
-          },
-        }),
+        body: JSON.stringify(payload),
       });
 
       if (!res.ok) {
@@ -187,7 +455,6 @@ export default function Home() {
     }
   };
 
-  // ✅ 上書き保存（PUT /history/{historyId}）
   const handleSaveOverwrite = async () => {
     setSaving(true);
     setError("");
@@ -202,10 +469,7 @@ export default function Home() {
       const res = await fetch(url, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          deviceId,
-          generatedPrompt,
-        }),
+        body: JSON.stringify({ deviceId, generatedPrompt }),
       });
 
       if (!res.ok) {
@@ -243,8 +507,13 @@ export default function Home() {
   return (
     <main style={{ padding: 32, maxWidth: 960, margin: "0 auto" }}>
       <header style={{ display: "flex", justifyContent: "space-between" }}>
-        <h1>Note Prompt Builder</h1>
-        <Link href="/history">履歴を見る →</Link>
+        <div style={{ display: "flex", gap: 12, alignItems: "baseline" }}>
+          <h1 style={{ margin: 0 }}>Note Prompt Builder</h1>
+          <span style={{ opacity: 0.7 }}>AI記事プロンプト生成ツール</span>
+        </div>
+        <div style={{ display: "flex", gap: 14, alignItems: "center" }}>
+          <Link href="/history">履歴 →</Link>
+        </div>
       </header>
 
       <div
@@ -256,11 +525,10 @@ export default function Home() {
           marginTop: 24,
         }}
       >
-        {/* ✅ 生成中ロック：フォーム全体 */}
         <div
           style={{
             display: "grid",
-            gap: 20,
+            gap: 18,
             opacity: formLocked ? 0.6 : 1,
             pointerEvents: formLocked ? "none" : "auto",
           }}
@@ -271,71 +539,84 @@ export default function Home() {
               style={textareaSmall}
               value={theme}
               onChange={(e) => setTheme(e.target.value)}
-              placeholder="例：AWS SAA合格までにやったこと／noteを継続できない原因と対策"
+              placeholder="例：noteが継続できない原因／プロンプト設計のコツ"
             />
           </div>
 
           <div>
-            <label>想定読者（必須）</label>
+            <label>記事の型（必須）</label>
+            <div style={{ display: "flex", gap: 10, marginTop: 8 }}>
+              {(["problem", "experience", "experiment"] as ArticleType[]).map(
+                (t) => (
+                  <Chip
+                    key={t}
+                    label={
+                      t === "problem"
+                        ? "問題解決"
+                        : t === "experience"
+                        ? "体験共有"
+                        : "実験ログ"
+                    }
+                    active={articleType === t}
+                    onClick={() => setArticleType(t)}
+                  />
+                )
+              )}
+            </div>
+          </div>
+
+          <div>
+            <label>主目的（必須・1つ）</label>
+            <div style={{ marginTop: 6, fontSize: 13, opacity: 0.75 }}>
+              🎯 主目的は1つに絞ると、記事の精度が上がります。
+            </div>
+            <select
+              style={{ ...inputStyle, backgroundColor: "white" }}
+              value={primaryGoal}
+              onChange={(e) => setPrimaryGoal(e.target.value as PrimaryGoalSlug)}
+            >
+              {PRIMARY_GOALS.map((g) => (
+                <option key={g.slug} value={g.slug}>
+                  {g.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label>想定読者（タグ選択 + 任意追記）</label>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 8 }}>
+              {TARGET_TAGS.map((t) => (
+                <Chip
+                  key={t}
+                  label={t}
+                  active={targetTags.includes(t)}
+                  onClick={() => toggleTag(t)}
+                />
+              ))}
+            </div>
+            <div style={{ marginTop: 10 }}>
+              <input
+                style={inputStyle}
+                value={targetDetail}
+                onChange={(e) => setTargetDetail(e.target.value)}
+                placeholder="任意：より具体的に（例：0〜10記事投稿済み、収益化に焦っている など）"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label>権威性（任意）</label>
             <textarea
               style={textareaSmall}
-              value={target}
-              onChange={(e) => setTarget(e.target.value)}
-              placeholder="例：大学生のエンジニア志望／note初心者／AWS学習者"
+              value={authority}
+              onChange={(e) => setAuthority(e.target.value)}
+              placeholder="例：50記事検証／PVや成約の数字／一次情報／実務経験"
             />
           </div>
 
           <div>
-            <label>記事の目的（必須）</label>
-            <textarea
-              style={textareaSmall}
-              value={goal}
-              onChange={(e) => setGoal(e.target.value)}
-              placeholder="例：読了後に今日から実行できるToDoが3つわかる状態にする"
-            />
-          </div>
-
-          <div>
-            <label>結論（任意）</label>
-            <textarea
-              style={textareaStyle}
-              value={conclusion}
-              onChange={(e) => setConclusion(e.target.value)}
-              placeholder={`例：
-継続できない原因は「やる気不足」ではなく、
-設計ミスだった。
-継続は感情ではなく仕組みで作れる。`}
-            />
-          </div>
-
-          <div>
-            <label>構成案（任意）</label>
-            <textarea
-              style={textareaStyle}
-              value={structurePlan}
-              onChange={(e) => setStructurePlan(e.target.value)}
-              placeholder={`例：
-1. はじめに：2週間投稿できなかった事実
-2. 結論：継続できない原因は仕組み不足
-3. なぜ続かなかったのか（3つの理由）
-4. 再始動のためにやった具体策
-5. 30分投稿テンプレ公開
-6. まとめ：今日からやること`}
-            />
-          </div>
-
-          <div>
-            <label>キーワード（カンマ区切り・最大10）</label>
-            <input
-              style={inputStyle}
-              value={keywordsText}
-              onChange={(e) => setKeywordsText(e.target.value)}
-              placeholder="例：note, AWS, 継続"
-            />
-          </div>
-
-          <div>
-            <label>文体プリセット</label>
+            <label>文体</label>
             <select
               style={{ ...inputStyle, backgroundColor: "white" }}
               value={stylePreset}
@@ -349,17 +630,172 @@ export default function Home() {
             </select>
           </div>
 
-          <div>
-            <label>入れたいエピソード（任意）</label>
-            <textarea
-              style={textareaStyle}
-              value={episodes}
-              onChange={(e) => setEpisodes(e.target.value)}
-            />
+          {articleType === "problem" && (
+            <div
+              style={{
+                background: "white",
+                border: "1px solid #e5e7eb",
+                borderRadius: 14,
+                padding: 16,
+              }}
+            >
+              <div style={{ fontWeight: 700, marginBottom: 12 }}>記事材料（問題解決）</div>
+
+              <div style={{ display: "grid", gap: 16 }}>
+                <BulletListInput
+                  label="解決する問題"
+                  value={pProblem}
+                  onChange={setPProblem}
+                  requiredAtLeastOne
+                  placeholder="例：毎回ゼロから考えて疲れる"
+                />
+                <BulletListInput
+                  label="あなたのエピソード"
+                  value={pEpisode}
+                  onChange={setPEpisode}
+                  requiredAtLeastOne
+                  placeholder="例：3日で投稿が止まった"
+                />
+                <BulletListInput
+                  label="問題の原因（任意）"
+                  value={pCause}
+                  onChange={setPCause}
+                  placeholder="例：型が決まっていない"
+                />
+                <BulletListInput
+                  label="解決手段"
+                  value={pSolutions}
+                  onChange={setPSolutions}
+                  requiredAtLeastOne
+                  placeholder="例：構造を固定する"
+                />
+                <DetailsRow
+                  label="今日やる行動（必須）"
+                  value={pTodayAction}
+                  onChange={setPTodayAction}
+                  placeholder="例：型を1つ決めて見出しだけ作る"
+                />
+              </div>
+            </div>
+          )}
+
+          {articleType === "experience" && (
+            <div
+              style={{
+                background: "white",
+                border: "1px solid #e5e7eb",
+                borderRadius: 14,
+                padding: 16,
+              }}
+            >
+              <div style={{ fontWeight: 700, marginBottom: 12 }}>記事材料（体験共有）</div>
+
+              <div style={{ display: "grid", gap: 16 }}>
+                <BulletListInput label="出来事" value={eEvent} onChange={setEEvent} requiredAtLeastOne />
+                <BulletListInput label="感情・状況" value={eFeelings} onChange={setEFeelings} requiredAtLeastOne />
+                <BulletListInput label="気づき" value={eInsight} onChange={setEInsight} requiredAtLeastOne />
+                <BulletListInput label="学び" value={eLearnings} onChange={setELearnings} requiredAtLeastOne />
+                <DetailsRow
+                  label="問い（必須）"
+                  value={eQuestion}
+                  onChange={setEQuestion}
+                  placeholder="例：なぜ続けられなかったのか？"
+                />
+                <DetailsRow
+                  label="メッセージ（必須）"
+                  value={eMessage}
+                  onChange={setEMessage}
+                  placeholder="例：継続は才能じゃなく設計"
+                />
+              </div>
+            </div>
+          )}
+
+          {articleType === "experiment" && (
+            <div
+              style={{
+                background: "white",
+                border: "1px solid #e5e7eb",
+                borderRadius: 14,
+                padding: 16,
+              }}
+            >
+              <div style={{ fontWeight: 700, marginBottom: 12 }}>記事材料（実験ログ）</div>
+
+              <div style={{ display: "grid", gap: 16 }}>
+                <div>
+                  <label style={{ fontWeight: 600 }}>仮説（必須）</label>
+                  <textarea
+                    style={textareaSmall}
+                    value={xHypothesis}
+                    onChange={(e) => setXHypothesis(e.target.value)}
+                    placeholder="例：主目的を1つに絞ると生成精度が上がる"
+                  />
+                </div>
+                <BulletListInput label="やったこと" value={xDid} onChange={setXDid} requiredAtLeastOne />
+                <BulletListInput label="結果" value={xResult} onChange={setXResult} requiredAtLeastOne />
+                <BulletListInput label="考察" value={xDiscussion} onChange={setXDiscussion} requiredAtLeastOne />
+                <BulletListInput label="次にやること" value={xNextAction} onChange={setXNextAction} requiredAtLeastOne />
+              </div>
+            </div>
+          )}
+
+          <div
+            style={{
+              background: "white",
+              border: "1px solid #e5e7eb",
+              borderRadius: 14,
+              padding: 16,
+            }}
+          >
+            <button
+              type="button"
+              onClick={() => setShowOptional((v) => !v)}
+              style={{
+                padding: "10px 12px",
+                borderRadius: 10,
+                border: "1px solid #d1d5db",
+                background: "white",
+                cursor: "pointer",
+                fontSize: 14,
+              }}
+            >
+              {showOptional ? "任意項目を閉じる" : "任意項目（根拠/失敗など）を開く"}
+            </button>
+
+            {showOptional && (
+              <div style={{ marginTop: 14, display: "grid", gap: 16 }}>
+                {articleType === "problem" && (
+                  <>
+                    <BulletListInput label="根拠（任意）" value={optEvidence} onChange={setOptEvidence} />
+                    <BulletListInput label="失敗例（任意）" value={optFailures} onChange={setOptFailures} />
+                  </>
+                )}
+
+                {articleType === "experience" && (
+                  <>
+                    <BulletListInput label="データ（任意）" value={optData} onChange={setOptData} />
+                    <BulletListInput
+                      label="失敗詳細（任意）"
+                      value={optFailureDetails}
+                      onChange={setOptFailureDetails}
+                    />
+                    <BulletListInput label="背景（任意）" value={optBackground} onChange={setOptBackground} />
+                  </>
+                )}
+
+                {articleType === "experiment" && (
+                  <>
+                    <BulletListInput label="比較（任意）" value={optCompare} onChange={setOptCompare} />
+                    <BulletListInput label="失敗（任意）" value={optXFailures} onChange={setOptXFailures} />
+                    <BulletListInput label="想定外（任意）" value={optUnexpected} onChange={setOptUnexpected} />
+                  </>
+                )}
+              </div>
+            )}
           </div>
         </div>
 
-        {/* ✅ ボタン類はロック対象外にしてもいいが、今回は誤操作防止でdisabled */}
         <button
           onClick={handleGenerate}
           disabled={!canGenerate}
@@ -378,7 +814,6 @@ export default function Home() {
           {loading ? "生成中..." : "プロンプト生成"}
         </button>
 
-        {/* ✅ 通知 */}
         {notice && (
           <div
             style={{
@@ -396,7 +831,6 @@ export default function Home() {
           </div>
         )}
 
-        {/* ✅ エラー */}
         {error && (
           <pre
             style={{
@@ -415,11 +849,9 @@ export default function Home() {
           </pre>
         )}
 
-        {/* ✅ 生成結果エリア（スケルトン/編集/保存） */}
         <div style={{ marginTop: 20 }}>
           <h2 style={{ marginBottom: 10 }}>生成結果</h2>
 
-          {/* スケルトン（最低限） */}
           {loading && (
             <div
               style={{
@@ -431,14 +863,30 @@ export default function Home() {
             >
               <div style={{ opacity: 0.7 }}>生成中…（数秒かかります）</div>
               <div style={{ marginTop: 10, height: 12, background: "#f3f4f6", borderRadius: 8 }} />
-              <div style={{ marginTop: 8, height: 12, background: "#f3f4f6", borderRadius: 8, width: "88%" }} />
-              <div style={{ marginTop: 8, height: 12, background: "#f3f4f6", borderRadius: 8, width: "72%" }} />
+              <div
+                style={{
+                  marginTop: 8,
+                  height: 12,
+                  background: "#f3f4f6",
+                  borderRadius: 8,
+                  width: "88%",
+                }}
+              />
+              <div
+                style={{
+                  marginTop: 8,
+                  height: 12,
+                  background: "#f3f4f6",
+                  borderRadius: 8,
+                  width: "72%",
+                }}
+              />
             </div>
           )}
 
           {!loading && !generatedPrompt && (
             <p style={{ opacity: 0.7 }}>
-              まだ生成結果がありません。フォームを入力して「プロンプト生成」を押してください。
+              まだ生成結果がありません。入力して「プロンプト生成」を押してください。
             </p>
           )}
 
@@ -446,10 +894,7 @@ export default function Home() {
             <>
               <div style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 10 }}>
                 <button
-                  onClick={() => {
-                    // 編集OFFに戻すときは dirty を残す（保存してないなら警告したいが、まずは単純化）
-                    setIsEditing((v) => !v);
-                  }}
+                  onClick={() => setIsEditing((v) => !v)}
                   style={{
                     padding: "10px 12px",
                     borderRadius: 10,
@@ -515,7 +960,7 @@ export default function Home() {
               />
 
               <div style={{ marginTop: 8, fontSize: 12, opacity: 0.75 }}>
-                historyId: {historyId || "（未生成）"} / deviceId: {deviceId || "..."}
+                historyId: {historyId || "（未生成）"} / deviceId: {deviceId || "..."} / templateId: note-v10
               </div>
             </>
           )}
