@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
+import styles from "./page.module.css";
 
 type HistoryInputs = any;
 
@@ -42,17 +43,9 @@ function SectionCard({
   children: React.ReactNode;
 }) {
   return (
-    <div
-      style={{
-        background: "white",
-        border: "1px solid #e5e7eb",
-        borderRadius: 16,
-        padding: 20,
-        marginBottom: 18,
-      }}
-    >
-      <h3 style={{ marginTop: 0, marginBottom: 14 }}>{title}</h3>
-      <div style={{ display: "grid", gap: 14 }}>{children}</div>
+    <div className={styles.sectionCard}>
+      <h3 className={styles.sectionCardTitle}>{title}</h3>
+      <div className={styles.sectionCardBody}>{children}</div>
     </div>
   );
 }
@@ -65,20 +58,9 @@ function ReadonlyField({
   value: string;
 }) {
   return (
-    <div>
-      <div style={{ fontWeight: 600, marginBottom: 6 }}>{label}</div>
-      <div
-        style={{
-          width: "100%",
-          minHeight: 44,
-          padding: "12px 14px",
-          borderRadius: 12,
-          border: "1px solid #d1d5db",
-          background: "#f9fafb",
-          lineHeight: 1.6,
-          whiteSpace: "pre-wrap",
-        }}
-      >
+    <div className={styles.field}>
+      <div className={styles.fieldLabel}>{label}</div>
+      <div className={styles.fieldValue}>
         {value?.trim() ? value : "（未入力）"}
       </div>
     </div>
@@ -92,23 +74,16 @@ function ReadonlyList({
   label: string;
   values?: string[];
 }) {
-  const list = Array.isArray(values) ? values.filter((v) => String(v).trim()) : [];
+  const list = Array.isArray(values)
+    ? values.filter((v) => String(v).trim())
+    : [];
 
   return (
-    <div>
-      <div style={{ fontWeight: 600, marginBottom: 6 }}>{label}</div>
-      <div
-        style={{
-          width: "100%",
-          padding: "12px 14px",
-          borderRadius: 12,
-          border: "1px solid #d1d5db",
-          background: "#f9fafb",
-          lineHeight: 1.6,
-        }}
-      >
+    <div className={styles.field}>
+      <div className={styles.fieldLabel}>{label}</div>
+      <div className={styles.listValue}>
         {list.length > 0 ? (
-          <ul style={{ margin: 0, paddingLeft: 20 }}>
+          <ul>
             {list.map((item, idx) => (
               <li key={idx}>{item}</li>
             ))}
@@ -158,10 +133,19 @@ function renderV10Inputs(inputs: any) {
     <>
       <SectionCard title="基本情報">
         <ReadonlyField label="記事テーマ" value={inputs?.theme ?? ""} />
-        <ReadonlyField label="記事の型" value={articleTypeLabel(articleType)} />
-        <ReadonlyField label="主目的" value={goalLabel(inputs?.primaryGoal ?? "")} />
+        <ReadonlyField
+          label="記事の型"
+          value={articleTypeLabel(articleType)}
+        />
+        <ReadonlyField
+          label="主目的"
+          value={goalLabel(inputs?.primaryGoal ?? "")}
+        />
         <ReadonlyList label="想定読者タグ" values={targets?.tags ?? []} />
-        <ReadonlyField label="想定読者（追記）" value={targets?.detail ?? ""} />
+        <ReadonlyField
+          label="想定読者（追記）"
+          value={targets?.detail ?? ""}
+        />
         <ReadonlyField label="権威性" value={inputs?.authority ?? ""} />
         <ReadonlyField label="文体" value={inputs?.stylePreset ?? ""} />
       </SectionCard>
@@ -169,11 +153,26 @@ function renderV10Inputs(inputs: any) {
       {articleType === "problem" && (
         <>
           <SectionCard title="記事材料（問題解決）">
-            <ReadonlyList label="解決する問題" values={materials?.problem?.problem ?? []} />
-            <ReadonlyList label="あなたのエピソード" values={materials?.problem?.episode ?? []} />
-            <ReadonlyList label="問題の原因" values={materials?.problem?.cause ?? []} />
-            <ReadonlyList label="解決手段" values={materials?.problem?.solutions ?? []} />
-            <ReadonlyField label="今日やる行動" value={materials?.problem?.todayAction ?? ""} />
+            <ReadonlyList
+              label="解決する問題"
+              values={materials?.problem?.problem ?? []}
+            />
+            <ReadonlyList
+              label="あなたのエピソード"
+              values={materials?.problem?.episode ?? []}
+            />
+            <ReadonlyList
+              label="問題の原因"
+              values={materials?.problem?.cause ?? []}
+            />
+            <ReadonlyList
+              label="解決手段"
+              values={materials?.problem?.solutions ?? []}
+            />
+            <ReadonlyField
+              label="今日やる行動"
+              value={materials?.problem?.todayAction ?? ""}
+            />
           </SectionCard>
 
           <SectionCard title="任意項目">
@@ -186,17 +185,38 @@ function renderV10Inputs(inputs: any) {
       {articleType === "experience" && (
         <>
           <SectionCard title="記事材料（体験共有）">
-            <ReadonlyList label="出来事" values={materials?.experience?.event ?? []} />
-            <ReadonlyList label="感情・状況" values={materials?.experience?.feelingsOrSituation ?? []} />
-            <ReadonlyList label="気づき" values={materials?.experience?.insight ?? []} />
-            <ReadonlyList label="学び" values={materials?.experience?.learnings ?? []} />
-            <ReadonlyField label="問い" value={materials?.experience?.question ?? ""} />
-            <ReadonlyField label="メッセージ" value={materials?.experience?.message ?? ""} />
+            <ReadonlyList
+              label="出来事"
+              values={materials?.experience?.event ?? []}
+            />
+            <ReadonlyList
+              label="感情・状況"
+              values={materials?.experience?.feelingsOrSituation ?? []}
+            />
+            <ReadonlyList
+              label="気づき"
+              values={materials?.experience?.insight ?? []}
+            />
+            <ReadonlyList
+              label="学び"
+              values={materials?.experience?.learnings ?? []}
+            />
+            <ReadonlyField
+              label="問い"
+              value={materials?.experience?.question ?? ""}
+            />
+            <ReadonlyField
+              label="メッセージ"
+              value={materials?.experience?.message ?? ""}
+            />
           </SectionCard>
 
           <SectionCard title="任意項目">
             <ReadonlyList label="データ" values={optional?.data ?? []} />
-            <ReadonlyList label="失敗詳細" values={optional?.failureDetails ?? []} />
+            <ReadonlyList
+              label="失敗詳細"
+              values={optional?.failureDetails ?? []}
+            />
             <ReadonlyList label="背景" values={optional?.background ?? []} />
           </SectionCard>
         </>
@@ -205,11 +225,26 @@ function renderV10Inputs(inputs: any) {
       {articleType === "experiment" && (
         <>
           <SectionCard title="記事材料（実験ログ）">
-            <ReadonlyField label="仮説" value={materials?.experiment?.hypothesis ?? ""} />
-            <ReadonlyList label="やったこと" values={materials?.experiment?.did ?? []} />
-            <ReadonlyList label="結果" values={materials?.experiment?.result ?? []} />
-            <ReadonlyList label="考察" values={materials?.experiment?.discussion ?? []} />
-            <ReadonlyList label="次にやること" values={materials?.experiment?.nextAction ?? []} />
+            <ReadonlyField
+              label="仮説"
+              value={materials?.experiment?.hypothesis ?? ""}
+            />
+            <ReadonlyList
+              label="やったこと"
+              values={materials?.experiment?.did ?? []}
+            />
+            <ReadonlyList
+              label="結果"
+              values={materials?.experiment?.result ?? []}
+            />
+            <ReadonlyList
+              label="考察"
+              values={materials?.experiment?.discussion ?? []}
+            />
+            <ReadonlyList
+              label="次にやること"
+              values={materials?.experiment?.nextAction ?? []}
+            />
           </SectionCard>
 
           <SectionCard title="任意項目">
@@ -231,7 +266,10 @@ function renderV9Inputs(inputs: any) {
       <ReadonlyField label="記事の目的" value={inputs?.goal ?? ""} />
       <ReadonlyField label="結論" value={inputs?.conclusion ?? ""} />
       <ReadonlyField label="構成案" value={inputs?.structurePlan ?? ""} />
-      <ReadonlyField label="権威性・一次情報" value={inputs?.authority ?? ""} />
+      <ReadonlyField
+        label="権威性・一次情報"
+        value={inputs?.authority ?? ""}
+      />
       <ReadonlyField label="エピソード" value={inputs?.episodes ?? ""} />
       <ReadonlyField
         label="キーワード"
@@ -239,7 +277,11 @@ function renderV9Inputs(inputs: any) {
       />
       <ReadonlyField
         label="参考リンク"
-        value={Array.isArray(inputs?.referenceLinks) ? inputs.referenceLinks.join("\n") : ""}
+        value={
+          Array.isArray(inputs?.referenceLinks)
+            ? inputs.referenceLinks.join("\n")
+            : ""
+        }
       />
       <ReadonlyField label="文体" value={inputs?.stylePreset ?? ""} />
       <ReadonlyField label="文字数感" value={inputs?.lengthPreset ?? ""} />
@@ -263,7 +305,9 @@ export default function HistoryDetailPage() {
         if (!historyId) throw new Error("historyId is missing");
 
         const deviceId = getDeviceId();
-        const url = `${base}/history/${historyId}?deviceId=${encodeURIComponent(deviceId)}`;
+        const url = `${base}/history/${historyId}?deviceId=${encodeURIComponent(
+          deviceId
+        )}`;
 
         const res = await fetch(url);
         if (!res.ok) {
@@ -302,74 +346,89 @@ export default function HistoryDetailPage() {
   const isV9 = templateId === "note-v9.0";
 
   return (
-    <main style={{ maxWidth: 980, margin: "40px auto", padding: 16 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-        <h1>履歴詳細</h1>
-        <Link href="/history">← 戻る</Link>
+    <main className={styles.page}>
+      <div className={styles.container}>
+        <header className={styles.header}>
+          <div className={styles.brand}>
+            <h1 className={styles.title}>履歴詳細</h1>
+            <p className={styles.subtitle}>
+              保存された入力内容と生成結果を確認できます。
+              v10の履歴では、型ごとの材料も分けて表示します。
+            </p>
+          </div>
+
+          <Link href="/history" className={styles.linkButton}>
+            ← 履歴へ戻る
+          </Link>
+        </header>
+
+        {error && <pre className={styles.errorBox}>{error}</pre>}
+
+        {!error && !data && (
+          <div className={styles.loadingBox}>
+            <div className={styles.loadingText}>読み込み中...</div>
+            <div className={styles.skeletonLine} />
+            <div className={styles.skeletonLine} style={{ width: "84%" }} />
+            <div className={styles.skeletonLine} style={{ width: "68%" }} />
+          </div>
+        )}
+
+        {!error && data && (
+          <>
+            <section className={styles.heroCard}>
+              <h2 className={styles.heroTitle}>{data.title || "untitled"}</h2>
+              <p className={styles.heroText}>
+                この履歴で入力した情報と、生成されたプロンプトの内容を確認できます。
+              </p>
+              <div className={styles.metaRow}>
+                <span className={styles.metaBadge}>
+                  {isV10 ? "v10" : isV9 ? "v9" : "unknown"}
+                </span>
+                <span className={styles.metaText}>{data.createdAt}</span>
+              </div>
+            </section>
+
+            <div className={styles.mainCard}>
+              <section className={styles.cardSection}>
+                <div className={styles.sectionHeader}>
+                  <h2 className={styles.sectionTitle}>入力内容</h2>
+                  <p className={styles.sectionDescription}>
+                    プロンプト生成時に使われた入力情報です。
+                  </p>
+                </div>
+
+                {isV10 && renderV10Inputs(inputs)}
+                {isV9 && renderV9Inputs(inputs)}
+
+                {!isV10 && !isV9 && inputs && (
+                  <SectionCard title="入力内容">
+                    <pre className={styles.rawBox}>
+                      {JSON.stringify(inputs, null, 2)}
+                    </pre>
+                  </SectionCard>
+                )}
+              </section>
+
+              <section className={styles.cardSection}>
+                <div className={styles.sectionHeader}>
+                  <h2 className={styles.sectionTitle}>生成結果</h2>
+                  <p className={styles.sectionDescription}>
+                    保存されているプロンプト全文です。
+                  </p>
+                </div>
+
+                <div className={styles.resultCard}>
+                  <textarea
+                    readOnly
+                    value={data.generatedPrompt}
+                    className={styles.resultArea}
+                  />
+                </div>
+              </section>
+            </div>
+          </>
+        )}
       </div>
-
-      {error && (
-        <pre
-          style={{
-            background: "#fef2f2",
-            color: "#7f1d1d",
-            padding: 12,
-            borderRadius: 12,
-            border: "1px solid #fecaca",
-            whiteSpace: "pre-wrap",
-            fontSize: 13,
-            lineHeight: 1.4,
-            marginBottom: 16,
-          }}
-        >
-          {error}
-        </pre>
-      )}
-
-      {!error && !data && <p style={{ opacity: 0.7 }}>読み込み中...</p>}
-
-      {!error && data && (
-        <>
-          <h2 style={{ marginTop: 16 }}>{data.title || "untitled"}</h2>
-          <div style={{ fontSize: 12, opacity: 0.8, marginBottom: 20 }}>{data.createdAt}</div>
-
-          {isV10 && renderV10Inputs(inputs)}
-          {isV9 && renderV9Inputs(inputs)}
-
-          {!isV10 && !isV9 && inputs && (
-            <SectionCard title="入力内容">
-              <pre
-                style={{
-                  margin: 0,
-                  whiteSpace: "pre-wrap",
-                  wordBreak: "break-word",
-                  fontSize: 13,
-                  lineHeight: 1.5,
-                }}
-              >
-                {JSON.stringify(inputs, null, 2)}
-              </pre>
-            </SectionCard>
-          )}
-
-          <SectionCard title="生成結果">
-            <textarea
-              readOnly
-              value={data.generatedPrompt}
-              style={{
-                width: "100%",
-                minHeight: 360,
-                padding: "12px 14px",
-                borderRadius: 12,
-                border: "1px solid #d1d5db",
-                fontSize: 14,
-                lineHeight: 1.5,
-                background: "#fff",
-              }}
-            />
-          </SectionCard>
-        </>
-      )}
     </main>
   );
 }
