@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import styles from "./page.module.css";
 
@@ -61,6 +61,51 @@ function Chip({
     >
       {label}
     </button>
+  );
+}
+
+function AutoResizeTextarea({
+  value,
+  onChange,
+  placeholder,
+  className,
+  minHeight = 44,
+  readOnly = false,
+}: {
+  value: string;
+  onChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => void;
+  placeholder?: string;
+  className?: string;
+  minHeight?: number;
+  readOnly?: boolean;
+}) {
+  const ref = useRef<HTMLTextAreaElement | null>(null);
+
+  const resize = () => {
+    const el = ref.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${Math.max(el.scrollHeight, minHeight)}px`;
+  };
+
+  useEffect(() => {
+    resize();
+  }, [value]);
+
+  return (
+    <textarea
+      ref={ref}
+      rows={1}
+      value={value}
+      onChange={(e) => {
+        onChange(e);
+        requestAnimationFrame(resize);
+      }}
+      placeholder={placeholder}
+      className={className}
+      readOnly={readOnly}
+      style={{ overflow: "hidden", resize: "none" }}
+    />
   );
 }
 
@@ -138,20 +183,18 @@ function BulletListInput({
 
       <div className={styles.fieldGroup} style={{ marginTop: 8 }}>
         {value.map((line, idx) => (
-          <div
-            key={idx}
-            style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 10 }}
-          >
-            <input
-              className={styles.textInput}
+          <div key={idx} className={styles.bulletRow}>
+            <AutoResizeTextarea
+              className={`${styles.textArea} ${styles.bulletTextarea}`}
               value={line}
               onChange={(e) => setAt(idx, e.target.value)}
               placeholder={placeholder}
+              minHeight={44}
             />
             <button
               type="button"
               onClick={() => remove(idx)}
-              className={styles.secondaryButton}
+              className={`${styles.secondaryButton} ${styles.bulletDeleteButton}`}
               title="削除"
             >
               ×
@@ -206,11 +249,12 @@ function DetailsRow({
         <div className={styles.tooltipBox}>{tooltip}</div>
       )}
 
-      <input
-        className={styles.textInput}
+      <AutoResizeTextarea
+        className={`${styles.textArea} ${styles.textAreaSm}`}
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
+        minHeight={74}
       />
     </div>
   );
@@ -239,7 +283,7 @@ const TARGET_TAGS = [
   "継続できない人",
   "AI活用したい人",
   "学生",
-  "社会人"
+  "社会人",
 ];
 
 export default function HomePage() {
@@ -655,13 +699,15 @@ export default function HomePage() {
                       />
                     ))}
                   </div>
-                  <input
-                    className={styles.textInput}
+                  <AutoResizeTextarea
+                    className={`${styles.textArea} ${styles.textAreaSm}`}
                     value={targetDetail}
                     onChange={(e) => setTargetDetail(e.target.value)}
                     placeholder="任意：より具体的に（例：0〜10記事投稿済み、収益化に焦っている など）"
+                    minHeight={74}
                   />
                 </div>
+
                 <div>
                   <div className={styles.fieldHeader}>
                     <label className={styles.label}>権威性（任意）</label>
@@ -677,9 +723,10 @@ export default function HomePage() {
                     </div>
                   </div>
 
-                  <div className={styles.fieldHint}>経験・実績・数字など、説得力になる要素</div>
+                  <div className={styles.fieldHint}>
+                    経験・実績・数字など、説得力になる要素
+                  </div>
 
-                  {/* 後で中身を書く */}
                   <div className={styles.tooltipBox} style={{ display: "none" }}>
                     TODO
                   </div>
@@ -736,7 +783,7 @@ export default function HomePage() {
                         requiredAtLeastOne
                         hint="読者が困っていること・悩み"
                         placeholder="例：毎回ゼロから考えて疲れる"
-                        tooltip={`読者が「それ自分のことだ」と感じる内容にしましょう`}
+                        tooltip="読者が「それ自分のことだ」と感じる内容にしましょう"
                       />
                       <BulletListInput
                         label="あなたのエピソード"
@@ -812,7 +859,7 @@ export default function HomePage() {
                         onChange={setEQuestion}
                         hint="読者に投げかける質問"
                         placeholder="例：あなたはなぜ続かないと思いますか？"
-                        tooltip={`記事の途中や最後で使う「読者への問い」です。読者に考えさせたり共感を引き出す役割があります。`}
+                        tooltip="記事の途中や最後で使う「読者への問い」です。読者に考えさせたり共感を引き出す役割があります。"
                       />
                       <DetailsRow
                         label="メッセージ（必須）"
@@ -820,7 +867,7 @@ export default function HomePage() {
                         onChange={setEMessage}
                         hint="あなたの体験から一番伝えたいこと"
                         placeholder="例：継続は才能ではなく設計です"
-                        tooltip={`記事の結論や締めくくりに使う一文です。読者に残したい核心のメッセージを書きます。`}
+                        tooltip="記事の結論や締めくくりに使う一文です。読者に残したい核心のメッセージを書きます。"
                       />
                     </div>
                   </div>
@@ -916,7 +963,7 @@ export default function HomePage() {
                             onChange={setOptEvidence}
                             hint="解決策が有効だと思う理由"
                             placeholder="例：この方法で50記事毎日投稿できた書いた"
-                            tooltip={`データ・経験・検証結果など、「なぜこの方法が有効なのか」を補強する材料です。`}
+                            tooltip="データ・経験・検証結果など、「なぜこの方法が有効なのか」を補強する材料です。"
                           />
                           <BulletListInput
                             label="失敗例（任意）"
@@ -924,7 +971,7 @@ export default function HomePage() {
                             onChange={setOptFailures}
                             hint="うまくいかなかったこと"
                             placeholder="例：AIに丸投げすると記事が薄くなった"
-                            tooltip={`失敗例を書くことで、読者が同じ遠回りをしないようにできます。`}
+                            tooltip="失敗例を書くことで、読者が同じ遠回りをしないようにできます。"
                           />
                         </>
                       )}
@@ -951,7 +998,7 @@ export default function HomePage() {
                             onChange={setOptFailureDetails}
                             hint="うまくいかなかった過程"
                             placeholder="例：AIに丸投げすると記事が薄くなった"
-                            tooltip={`失敗例を書くことで、読者が同じ遠回りをしないようにできます。`}
+                            tooltip="失敗例を書くことで、読者が同じ遠回りをしないようにできます。"
                           />
                         </>
                       )}
@@ -971,7 +1018,7 @@ export default function HomePage() {
                             onChange={setOptCompare}
                             hint="他の方法、考えとの違い"
                             placeholder="例：一から記事を書く方法"
-                            tooltip={'他の方法や以前の状態と比較して、結果の違いを書きます'}
+                            tooltip="他の方法や以前の状態と比較して、結果の違いを書きます"
                           />
                           <BulletListInput
                             label="失敗例（任意）"
@@ -979,7 +1026,7 @@ export default function HomePage() {
                             onChange={setOptXFailures}
                             hint="うまくいかなかった試み"
                             placeholder="例：AIに丸投げすると記事が薄くなった"
-                            tooltip={`失敗例を書くことで、読者が同じ遠回りをしないようにできます。`}
+                            tooltip="失敗例を書くことで、読者が同じ遠回りをしないようにできます。"
                           />
                           <BulletListInput
                             label="想定外（任意）"
@@ -1020,7 +1067,9 @@ export default function HomePage() {
 
               {loading && (
                 <div className={styles.skeletonBox}>
-                  <div className={styles.skeletonText}>生成中…（数秒かかります）</div>
+                  <div className={styles.skeletonText}>
+                    生成中…（数秒かかります）
+                  </div>
                   <div className={styles.skeletonLine} />
                   <div className={styles.skeletonLine} style={{ width: "88%" }} />
                   <div className={styles.skeletonLine} style={{ width: "72%" }} />
@@ -1082,8 +1131,8 @@ export default function HomePage() {
                   />
 
                   <div className={styles.resultMeta}>
-                    historyId: {historyId || "（未生成）"} / deviceId: {deviceId || "..."} /
-                    templateId: note-v10
+                    historyId: {historyId || "（未生成）"} / deviceId:{" "}
+                    {deviceId || "..."} / templateId: note-v10
                   </div>
                 </div>
               )}
