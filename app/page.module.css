@@ -761,3 +761,159 @@
       padding: 18px;
     }
   }
+  .styleCardGrid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+  
+  .styleCard {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    text-align: left;
+    width: 100%;
+    border: 1px solid var(--border);
+    background: #fff;
+    border-radius: 18px;
+    padding: 16px;
+    cursor: pointer;
+    transition:
+      border-color 0.2s ease,
+      background 0.2s ease,
+      transform 0.15s ease,
+      box-shadow 0.2s ease;
+  }
+  
+  .styleCard:hover {
+    transform: translateY(-1px);
+    border-color: var(--border-strong);
+    background: var(--surface-strong);
+    box-shadow: 0 10px 20px rgba(20, 17, 29, 0.05);
+  }
+  
+  .styleCardActive {
+    border-color: var(--primary);
+    background: var(--primary-soft);
+    box-shadow: 0 12px 24px rgba(20, 17, 29, 0.06);
+  }
+  
+  .styleCardTitle {
+    font-size: 15px;
+    font-weight: 750;
+    color: var(--text);
+    line-height: 1.4;
+  }
+  
+  .styleCardText {
+    font-size: 13px;
+    line-height: 1.65;
+    color: var(--text-soft);
+    word-break: break-word;
+  }
+  .guideOverlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.4);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+  }
+  
+  .guideOverlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(20, 17, 29, 0.45);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    z-index: 9999;
+  }
+  
+  .guideModal {
+    position: relative;
+    background: transparent;
+    padding: 0;
+    border-radius: 0;
+    max-width: min(720px, 92vw);
+    max-height: 92vh;
+    box-shadow: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  
+  .guideImage {
+    display: block;
+    width: 100%;
+    max-width: min(720px, 92vw);
+    max-height: 92vh;
+    height: auto;
+    object-fit: contain;
+    border-radius: 18px;
+    box-shadow: 0 20px 48px rgba(20, 17, 29, 0.22);
+  }
+  
+  .guideClose {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    width: 42px;
+    height: 42px;
+    border: 1px solid rgba(20, 17, 29, 0.12);
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.96);
+    color: #14111d;
+    font-size: 24px;
+    line-height: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    box-shadow: 0 8px 20px rgba(20, 17, 29, 0.16);
+    transition:
+      transform 0.15s ease,
+      background 0.2s ease,
+      box-shadow 0.2s ease;
+  }
+  
+  .guideClose:hover {
+    transform: translateY(-1px);
+    background: #ffffff;
+    box-shadow: 0 10px 24px rgba(20, 17, 29, 0.22);
+  }
+  
+  .guideClose:focus-visible {
+    outline: 2px solid #1a1624;
+    outline-offset: 2px;
+  }
+  
+  @media (max-width: 640px) {
+    .guideOverlay {
+      padding: 12px;
+    }
+  
+    .guideModal {
+      max-width: 100%;
+      max-height: 100%;
+    }
+  
+    .guideImage {
+      max-width: 100%;
+      max-height: 88vh;
+      border-radius: 14px;
+    }
+  
+    .guideClose {
+      top: 8px;
+      right: 8px;
+      width: 38px;
+      height: 38px;
+      font-size: 22px;
+    }
+  }

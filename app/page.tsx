@@ -259,6 +259,7 @@ function DetailsRow({
     </div>
   );
 }
+
 type ArticleType = "problem" | "experience" | "experiment";
 
 type PrimaryGoalSlug =
@@ -284,6 +285,38 @@ const TARGET_TAGS = [
   "AI活用したい人",
   "学生",
   "社会人",
+];
+
+const STYLE_PRESET_OPTIONS: {
+  value: string;
+  title: string;
+  description: string;
+}[] = [
+  {
+    value: "casual",
+    title: "casual",
+    description: "自然で親しみやすい、標準的な文体。",
+  },
+  {
+    value: "logical",
+    title: "logical",
+    description: "結論→理由→具体例で整理して伝える文体。",
+  },
+  {
+    value: "passionate",
+    title: "passionate",
+    description: "熱量や主張を強めに出す文体。",
+  },
+  {
+    value: "friendly",
+    title: "friendly",
+    description: "ため口寄りで距離の近い、やさしい文体。",
+  },
+  {
+    value: "professional",
+    title: "professional",
+    description: "丁寧で信頼感のある文体。落ち着いて整った印象になります。",
+  },
 ];
 
 export default function HomePage() {
@@ -341,6 +374,7 @@ export default function HomePage() {
 
   const [isEditing, setIsEditing] = useState(false);
   const [dirty, setDirty] = useState(false);
+  const [showGuide, setShowGuide] = useState(false);
 
   useEffect(() => {
     setDeviceId(getOrCreateDeviceId());
@@ -472,19 +506,20 @@ export default function HomePage() {
     setDirty(false);
     setGeneratedPrompt("");
     setHistoryId("");
-
+    setShowGuide(false);
+  
     try {
       if (!apiBase) throw new Error("NEXT_PUBLIC_API_BASE is not set");
       if (!deviceId) throw new Error("deviceId is not ready");
-
+  
       const payload = buildPayloadV10();
-
+  
       const res = await fetch(`${apiBase}/generate`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
-
+  
       if (!res.ok) {
         const body = await readErrorBody(res);
         const hint = statusHint(res.status);
@@ -500,11 +535,12 @@ export default function HomePage() {
             .join("\n")
         );
       }
-
+  
       const data = await res.json();
       setGeneratedPrompt(data.generatedPrompt ?? "");
       setHistoryId(data.historyId ?? "");
       setNotice("生成しました（履歴に保存済み）");
+      setShowGuide(true);
     } catch (e: any) {
       setError(e?.message ?? "Failed");
     } finally {
@@ -738,20 +774,23 @@ export default function HomePage() {
                     placeholder="例：50記事検証／PVや成約の数字／一次情報／実務経験"
                   />
                 </div>
-
                 <div>
                   <label className={styles.label}>文体</label>
-                  <select
-                    className={styles.select}
-                    value={stylePreset}
-                    onChange={(e) => setStylePreset(e.target.value)}
-                  >
-                    <option value="casual">casual</option>
-                    <option value="logical">logical</option>
-                    <option value="passionate">passionate</option>
-                    <option value="friendly">friendly</option>
-                    <option value="professional">professional</option>
-                  </select>
+                  <div className={styles.styleCardGrid}>
+                    {STYLE_PRESET_OPTIONS.map((opt) => (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        onClick={() => setStylePreset(opt.value)}
+                        className={`${styles.styleCard} ${
+                          stylePreset === opt.value ? styles.styleCardActive : ""
+                        }`}
+                      >
+                        <div className={styles.styleCardTitle}>{opt.title}</div>
+                        <div className={styles.styleCardText}>{opt.description}</div>
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </div>
             </section>
@@ -1099,6 +1138,19 @@ export default function HomePage() {
                     >
                       コピー
                     </button>
+                    <button
+                      onClick={() => window.open("https://chat.openai.com", "_blank")}
+                      className={styles.linkButton}
+                    >
+                      ChatGPT
+                    </button>
+
+                    <button
+                      onClick={() => window.open("https://gemini.google.com", "_blank")}
+                      className={styles.linkButton}
+                    >
+                      Gemini
+                    </button>
 
                     <div className={styles.resultToolbarSpacer} />
 
@@ -1133,6 +1185,24 @@ export default function HomePage() {
                   <div className={styles.resultMeta}>
                     historyId: {historyId || "（未生成）"} / deviceId:{" "}
                     {deviceId || "..."} / templateId: note-v10
+                  </div>
+                </div>
+              )}
+              {showGuide && (
+                <div className={styles.guideOverlay}>
+                  <div className={styles.guideModal}>
+                    <button
+                      className={styles.guideClose}
+                      onClick={() => setShowGuide(false)}
+                    >
+                      ×
+                    </button>
+
+                    <img
+                      src="/how-to-use-note-prompt-builder.png"
+                      alt="使い方"
+                      className={styles.guideImage}
+                    />
                   </div>
                 </div>
               )}
