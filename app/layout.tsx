@@ -52,6 +52,23 @@ export const metadata: Metadata = {
   },
 };
 
+const jsonLd = {
+  "@context": "https://schema.org",
+  "@type": "WebApplication",
+  name: "Note Prompt Builder",
+  url: "https://note-prompt-builder.vercel.app",
+  description:
+    "note記事作成を効率化するプロンプト自動生成ツール。操作はシンプル、構成はお任せ。あなたは記事の中身だけに集中できます。",
+  applicationCategory: "ProductivityApplication",
+  operatingSystem: "Web",
+  inLanguage: "ja",
+  offers: {
+    "@type": "Offer",
+    price: "0",
+    priceCurrency: "JPY",
+  },
+};
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -59,6 +76,12 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="ja">
+      <head>
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        />
+      </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
