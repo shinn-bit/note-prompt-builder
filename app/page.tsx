@@ -338,10 +338,18 @@ export default function HomePage() {
   const [dirty, setDirty] = useState(false);
 
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const skipSplash = params.get("skipSplash") === "1";
+
     setDeviceId(getOrCreateDeviceId());
     const savedStep = Number(localStorage.getItem(STEP_KEY));
     if (savedStep === 0 || savedStep === 1 || savedStep === 2) {
       setStep(savedStep as Step);
+    }
+    if (skipSplash) {
+      setShowSplash(false);
+      window.history.replaceState(null, "", window.location.pathname);
+      return;
     }
     const timer = window.setTimeout(() => setShowSplash(false), 3000);
     return () => window.clearTimeout(timer);

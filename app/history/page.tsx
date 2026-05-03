@@ -58,7 +58,19 @@ export default function HistoryPage() {
       setError("");
       try {
         const res = await fetchHistory(100);
-        setItems(res.items ?? []);
+        const historyItems = res.items ?? [];
+        setItems(historyItems);
+
+        const detailResults = await Promise.allSettled(
+          historyItems.map((item) => fetchHistoryDetail(item.historyId))
+        );
+        const nextDetails: Record<string, HistoryDetail> = {};
+        detailResults.forEach((result) => {
+          if (result.status === "fulfilled") {
+            nextDetails[result.value.item.historyId] = result.value.item;
+          }
+        });
+        setDetails(nextDetails);
       } catch (e: unknown) {
         setError(e instanceof Error ? e.message : "Failed");
       } finally {
@@ -130,7 +142,7 @@ export default function HistoryPage() {
             <div className={styles.logoBadge}>N</div>
             <h1 className={styles.pageTitle}>プロンプト履歴</h1>
           </div>
-          <Link href="/" className={styles.backLink}>
+          <Link href="/?skipSplash=1" className={styles.backLink}>
             作成に戻る
           </Link>
         </header>
