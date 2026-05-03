@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import styles from "./page.module.css";
 
 const DEVICE_ID_KEY = "notePromptDeviceId";
@@ -260,6 +262,25 @@ function DetailsRow({
   );
 }
 
+function MarkdownPreview({ markdown }: { markdown: string }) {
+  return (
+    <div className={styles.markdownPreview}>
+      <ReactMarkdown
+        remarkPlugins={[remarkGfm]}
+        components={{
+          a: ({ children, href }) => (
+            <a href={href} target="_blank" rel="noreferrer">
+              {children}
+            </a>
+          ),
+        }}
+      >
+        {markdown}
+      </ReactMarkdown>
+    </div>
+  );
+}
+
 type ArticleType = "problem" | "experience" | "experiment";
 
 type PrimaryGoalSlug =
@@ -366,10 +387,16 @@ export default function HomePage() {
 
   const [generatedPrompt, setGeneratedPrompt] = useState("");
   const [historyId, setHistoryId] = useState<string>("");
+  const [articleTitleIdeas, setArticleTitleIdeas] = useState<string[]>([]);
+  const [articleOutline, setArticleOutline] = useState<string[]>([]);
+  const [generatedArticleMarkdown, setGeneratedArticleMarkdown] = useState("");
+  const [articleModel, setArticleModel] = useState("");
 
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [articleLoading, setArticleLoading] = useState(false);
   const [error, setError] = useState("");
+  const [articleError, setArticleError] = useState("");
   const [notice, setNotice] = useState("");
 
   const [isEditing, setIsEditing] = useState(false);
@@ -506,6 +533,11 @@ export default function HomePage() {
     setDirty(false);
     setGeneratedPrompt("");
     setHistoryId("");
+    setArticleTitleIdeas([]);
+    setArticleOutline([]);
+    setGeneratedArticleMarkdown("");
+    setArticleModel("");
+    setArticleError("");
     setShowGuide(false);
   
     try {
@@ -595,6 +627,62 @@ export default function HomePage() {
     await navigator.clipboard.writeText(generatedPrompt);
     setNotice("コピーしました");
     setTimeout(() => setNotice(""), 1500);
+  };
+
+  const handleCopyArticle = async () => {
+    await navigator.clipboard.writeText(generatedArticleMarkdown);
+    setNotice("記事本文をコピーしました");
+    setTimeout(() => setNotice(""), 1500);
+  };
+
+  const handleGenerateArticle = async () => {
+    setArticleLoading(true);
+    setArticleError("");
+    setNotice("");
+    setArticleTitleIdeas([]);
+    setArticleOutline([]);
+    setGeneratedArticleMarkdown("");
+    setArticleModel("");
+
+    try {
+      if (!generatedPrompt.trim()) {
+        throw new Error("先にプロンプトを生成してください");
+      }
+
+      const res = await fetch("/api/article/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt: generatedPrompt }),
+      });
+
+      if (!res.ok) {
+        const body = await readErrorBody(res);
+        throw new Error(
+          [
+            "Article Generate Error",
+            `Status: ${res.status} ${res.statusText}`,
+            body ? `Body:\n${body}` : "",
+          ]
+            .filter(Boolean)
+            .join("\n")
+        );
+      }
+
+      const data = await res.json();
+      setArticleTitleIdeas(
+        Array.isArray(data.titleIdeas) ? data.titleIdeas : []
+      );
+      setArticleOutline(Array.isArray(data.outline) ? data.outline : []);
+      setGeneratedArticleMarkdown(data.articleMarkdown ?? "");
+      setArticleModel(data.model ?? "");
+      setNotice("記事本文を生成しました");
+    } catch (e: unknown) {
+      setArticleError(
+        e instanceof Error ? e.message : "Failed to generate article"
+      );
+    } finally {
+      setArticleLoading(false);
+    }
   };
 
   return (
@@ -1152,6 +1240,14 @@ export default function HomePage() {
                       Gemini
                     </button>
 
+                    <button
+                      onClick={handleGenerateArticle}
+                      disabled={articleLoading || !generatedPrompt.trim()}
+                      className={styles.successButton}
+                    >
+                      {articleLoading ? "記事生成中..." : "記事本文を生成"}
+                    </button>
+
                     <div className={styles.resultToolbarSpacer} />
 
                     <button
@@ -1185,6 +1281,82 @@ export default function HomePage() {
                   <div className={styles.resultMeta}>
                     historyId: {historyId || "（未生成）"} / deviceId:{" "}
                     {deviceId || "..."} / templateId: note-v10
+                  </div>
+                </div>
+              )}
+              {articleError && <pre className={styles.errorBox}>{articleError}</pre>}
+
+              {articleLoading && (
+                <div className={styles.skeletonBox}>
+                  <div className={styles.skeletonText}>
+                    記事本文を生成中です...
+                  </div>
+                  <div className={styles.skeletonLine} />
+                  <div className={styles.skeletonLine} style={{ width: "88%" }} />
+                  <div className={styles.skeletonLine} style={{ width: "72%" }} />
+                </div>
+              )}
+
+              {!articleLoading && generatedArticleMarkdown && (
+                <div className={styles.resultCard} style={{ marginTop: 18 }}>
+                  <div className={styles.resultToolbar}>
+                    <button
+                      onClick={handleCopyArticle}
+                      disabled={!generatedArticleMarkdown.trim()}
+                      className={styles.secondaryButton}
+                    >
+                      記事本文をコピー
+                    </button>
+                    <div className={styles.resultToolbarSpacer} />
+                    <div className={styles.resultMeta}>
+                      article model: {articleModel || "unknown"}
+                    </div>
+                  </div>
+
+                  <div className={styles.articleOutputGrid}>
+                    <div className={styles.articleInfoCard}>
+                      <h3 className={styles.articleInfoTitle}>記事タイトル案</h3>
+                      {articleTitleIdeas.length > 0 ? (
+                        <ul className={styles.articleInfoList}>
+                          {articleTitleIdeas.map((title, idx) => (
+                            <li key={idx}>{title}</li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <p className={styles.articleInfoEmpty}>タイトル案はありません。</p>
+                      )}
+                    </div>
+
+                    <div className={styles.articleInfoCard}>
+                      <h3 className={styles.articleInfoTitle}>記事構成案</h3>
+                      {articleOutline.length > 0 ? (
+                        <ol className={styles.articleInfoList}>
+                          {articleOutline.map((heading, idx) => (
+                            <li key={idx}>{heading}</li>
+                          ))}
+                        </ol>
+                      ) : (
+                        <p className={styles.articleInfoEmpty}>構成案はありません。</p>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className={styles.articleBodyGrid}>
+                    <div>
+                      <h3 className={styles.articleInfoTitle}>記事本文 Markdown</h3>
+                      <textarea
+                        className={styles.resultAreaSoft}
+                        value={generatedArticleMarkdown}
+                        onChange={(e) =>
+                          setGeneratedArticleMarkdown(e.target.value)
+                        }
+                      />
+                    </div>
+
+                    <div>
+                      <h3 className={styles.articleInfoTitle}>Markdownプレビュー</h3>
+                      <MarkdownPreview markdown={generatedArticleMarkdown} />
+                    </div>
                   </div>
                 </div>
               )}
