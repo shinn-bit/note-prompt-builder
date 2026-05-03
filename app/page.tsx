@@ -1,12 +1,14 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import styles from "./page.module.css";
 
 const DEVICE_ID_KEY = "notePromptDeviceId";
+const STEP_KEY = "notePromptBuilderStep";
 
 function getOrCreateDeviceId(): string {
   const existing = localStorage.getItem(DEVICE_ID_KEY);
@@ -36,34 +38,14 @@ async function readErrorBody(res: Response): Promise<string> {
 
 function statusHint(status: number): string {
   return status === 500
-    ? "（Lambdaのログ/環境変数/権限/S3キー/Dynamoを確認）"
+    ? "Lambda のログ、環境変数、権限、S3 キー、DynamoDB を確認してください。"
     : status === 404
-    ? "（API Gatewayのルート/ステージ/パスを確認）"
+    ? "API Gateway のルート、ステージ、パスを確認してください。"
     : status === 400
-    ? "（リクエストJSONの形式・必須項目を確認）"
+    ? "リクエスト JSON の形式と必須項目を確認してください。"
     : status === 403
-    ? "（CORS/認可/権限を確認）"
+    ? "CORS、認可、権限を確認してください。"
     : "";
-}
-
-function Chip({
-  label,
-  active,
-  onClick,
-}: {
-  label: string;
-  active: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`${styles.chip} ${active ? styles.chipActive : ""}`}
-    >
-      {label}
-    </button>
-  );
 }
 
 function AutoResizeTextarea({
@@ -83,16 +65,16 @@ function AutoResizeTextarea({
 }) {
   const ref = useRef<HTMLTextAreaElement | null>(null);
 
-  const resize = () => {
+  const resize = useCallback(() => {
     const el = ref.current;
     if (!el) return;
     el.style.height = "auto";
     el.style.height = `${Math.max(el.scrollHeight, minHeight)}px`;
-  };
+  }, [minHeight]);
 
   useEffect(() => {
     resize();
-  }, [value]);
+  }, [resize, value]);
 
   return (
     <textarea
@@ -111,83 +93,60 @@ function AutoResizeTextarea({
   );
 }
 
+function Field({
+  label,
+  hint,
+  required,
+  optional,
+  children,
+}: {
+  label: string;
+  hint?: string;
+  required?: boolean;
+  optional?: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className={styles.field}>
+      <label className={styles.fieldLabel}>
+        {label}
+        {required && <span className={styles.requiredBadge}>必須</span>}
+        {optional && <span className={styles.optionalBadge}>任意</span>}
+      </label>
+      {hint && <div className={styles.fieldHint}>{hint}</div>}
+      {children}
+    </div>
+  );
+}
+
 function BulletListInput({
   label,
   value,
   onChange,
   placeholder,
-  requiredAtLeastOne,
+  required,
   hint,
-  tooltip,
 }: {
   label: string;
   value: string[];
   onChange: (next: string[]) => void;
   placeholder?: string;
-  requiredAtLeastOne?: boolean;
+  required?: boolean;
   hint?: string;
-  tooltip?: string;
 }) {
-  const [showTooltip, setShowTooltip] = useState(false);
-
   const setAt = (idx: number, v: string) => {
     const next = value.slice();
     next[idx] = v;
     onChange(next);
   };
 
-  const add = () => onChange([...value, ""]);
-  const remove = (idx: number) => onChange(value.filter((_, i) => i !== idx));
-
-  const nonEmptyCount = value.filter((x) => x.trim()).length;
-  const showWarn = !!requiredAtLeastOne && nonEmptyCount === 0;
-
   return (
-    <div>
-      <div className={styles.fieldHeader}>
-        <label className={styles.label}>{label}</label>
-
-        {requiredAtLeastOne && (
-          <span className={styles.inlineHint}>（最低1つ）</span>
-        )}
-
-        {showWarn && <span className={styles.requiredText}>入力が必要</span>}
-
-        {tooltip && (
-          <div className={styles.tooltipWrap}>
-            <button
-              type="button"
-              className={styles.tooltipButton}
-              onClick={() => setShowTooltip((v) => !v)}
-              aria-label={`${label}の説明を表示`}
-              title="説明を見る"
-            >
-              ?
-            </button>
-          </div>
-        )}
-
-        <button
-          type="button"
-          onClick={add}
-          className={styles.secondaryButton}
-          style={{ marginLeft: "auto" }}
-        >
-          + 追加
-        </button>
-      </div>
-
-      {hint && <div className={styles.fieldHint}>{hint}</div>}
-
-      {tooltip && showTooltip && (
-        <div className={styles.tooltipBox}>{tooltip}</div>
-      )}
-
-      <div className={styles.fieldGroup} style={{ marginTop: 8 }}>
+    <Field label={label} required={required} optional={!required} hint={hint}>
+      <div className={styles.bulletList}>
         {value.map((line, idx) => (
           <div key={idx} className={styles.bulletRow}>
             <AutoResizeTextarea
-              className={`${styles.textArea} ${styles.bulletTextarea}`}
+              className={`${styles.input} ${styles.bulletTextarea}`}
               value={line}
               onChange={(e) => setAt(idx, e.target.value)}
               placeholder={placeholder}
@@ -195,70 +154,23 @@ function BulletListInput({
             />
             <button
               type="button"
-              onClick={() => remove(idx)}
-              className={`${styles.secondaryButton} ${styles.bulletDeleteButton}`}
-              title="削除"
+              onClick={() => onChange(value.filter((_, i) => i !== idx))}
+              className={styles.bulletDelete}
+              aria-label="削除"
             >
-              ×
+              x
             </button>
           </div>
         ))}
+        <button
+          type="button"
+          onClick={() => onChange([...value, ""])}
+          className={styles.addRowButton}
+        >
+          + 行を追加
+        </button>
       </div>
-    </div>
-  );
-}
-
-function DetailsRow({
-  label,
-  value,
-  onChange,
-  placeholder,
-  hint,
-  tooltip,
-}: {
-  label: string;
-  value: string;
-  onChange: (v: string) => void;
-  placeholder?: string;
-  hint?: string;
-  tooltip?: string;
-}) {
-  const [showTooltip, setShowTooltip] = useState(false);
-
-  return (
-    <div>
-      <div className={styles.fieldHeader}>
-        <label className={styles.label}>{label}</label>
-
-        {tooltip && (
-          <div className={styles.tooltipWrap}>
-            <button
-              type="button"
-              className={styles.tooltipButton}
-              onClick={() => setShowTooltip((v) => !v)}
-              aria-label={`${label}の説明を表示`}
-              title="説明を見る"
-            >
-              ?
-            </button>
-          </div>
-        )}
-      </div>
-
-      {hint && <div className={styles.fieldHint}>{hint}</div>}
-
-      {tooltip && showTooltip && (
-        <div className={styles.tooltipBox}>{tooltip}</div>
-      )}
-
-      <AutoResizeTextarea
-        className={`${styles.textArea} ${styles.textAreaSm}`}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
-        minHeight={74}
-      />
-    </div>
+    </Field>
   );
 }
 
@@ -281,8 +193,8 @@ function MarkdownPreview({ markdown }: { markdown: string }) {
   );
 }
 
+type Step = 0 | 1 | 2;
 type ArticleType = "problem" | "experience" | "experiment";
-
 type PrimaryGoalSlug =
   | "action"
   | "collect_feedback"
@@ -290,11 +202,39 @@ type PrimaryGoalSlug =
   | "lead_paid"
   | "fan_build";
 
+const STEPS = ["基本設定", "記事素材", "生成結果"];
+
+const ARTICLE_TYPES: {
+  id: ArticleType;
+  icon: string;
+  title: string;
+  description: string;
+}[] = [
+  {
+    id: "problem",
+    icon: "!",
+    title: "問題解決型",
+    description: "課題、原因、解決策を整理する記事",
+  },
+  {
+    id: "experience",
+    icon: "*",
+    title: "体験共有型",
+    description: "出来事、感情、学びを共有する記事",
+  },
+  {
+    id: "experiment",
+    icon: "#",
+    title: "実験ログ型",
+    description: "仮説、実行、結果、考察を残す記事",
+  },
+];
+
 const PRIMARY_GOALS: { slug: PrimaryGoalSlug; label: string }[] = [
   { slug: "action", label: "行動してもらう" },
-  { slug: "collect_feedback", label: "感想/改善案を集める" },
+  { slug: "collect_feedback", label: "感想・改善案を集める" },
   { slug: "build_trust", label: "信頼を作る" },
-  { slug: "lead_paid", label: "有料/商品へ誘導" },
+  { slug: "lead_paid", label: "有料・商品へ誘導" },
   { slug: "fan_build", label: "ファン化" },
 ];
 
@@ -308,49 +248,45 @@ const TARGET_TAGS = [
   "社会人",
 ];
 
-const STYLE_PRESET_OPTIONS: {
-  value: string;
-  title: string;
-  description: string;
-}[] = [
+const STYLE_PRESET_OPTIONS = [
   {
     value: "casual",
-    title: "casual",
-    description: "自然で親しみやすい、標準的な文体。",
+    title: "カジュアル",
+    description: "自然で親しみやすい",
   },
   {
     value: "logical",
-    title: "logical",
-    description: "結論→理由→具体例で整理して伝える文体。",
+    title: "ロジカル",
+    description: "結論と理由を整理",
   },
   {
     value: "passionate",
-    title: "passionate",
-    description: "熱量や主張を強めに出す文体。",
+    title: "情熱的",
+    description: "主張と熱量を強める",
   },
   {
     value: "friendly",
-    title: "friendly",
-    description: "ため口寄りで距離の近い、やさしい文体。",
+    title: "フレンドリー",
+    description: "距離感が近くやさしい",
   },
   {
     value: "professional",
-    title: "professional",
-    description: "丁寧で信頼感のある文体。落ち着いて整った印象になります。",
+    title: "プロフェッショナル",
+    description: "丁寧で信頼感がある",
   },
 ];
 
 export default function HomePage() {
   const [deviceId, setDeviceId] = useState("");
+  const [step, setStep] = useState<Step>(0);
+  const [showSplash, setShowSplash] = useState(true);
   const apiBase = useMemo(() => process.env.NEXT_PUBLIC_API_BASE ?? "", []);
 
   const [theme, setTheme] = useState("");
   const [articleType, setArticleType] = useState<ArticleType>("problem");
   const [primaryGoal, setPrimaryGoal] = useState<PrimaryGoalSlug>("action");
-
   const [targetTags, setTargetTags] = useState<string[]>([]);
   const [targetDetail, setTargetDetail] = useState("");
-
   const [authority, setAuthority] = useState("");
   const [stylePreset, setStylePreset] = useState("casual");
 
@@ -362,6 +298,7 @@ export default function HomePage() {
 
   const [optEvidence, setOptEvidence] = useState<string[]>([""]);
   const [optFailures, setOptFailures] = useState<string[]>([""]);
+  const [optBackground, setOptBackground] = useState<string[]>([""]);
   const [showOptional, setShowOptional] = useState(false);
 
   const [eEvent, setEEvent] = useState<string[]>([""]);
@@ -370,17 +307,14 @@ export default function HomePage() {
   const [eLearnings, setELearnings] = useState<string[]>([""]);
   const [eQuestion, setEQuestion] = useState("");
   const [eMessage, setEMessage] = useState("");
-
   const [optData, setOptData] = useState<string[]>([""]);
   const [optFailureDetails, setOptFailureDetails] = useState<string[]>([""]);
-  const [optBackground, setOptBackground] = useState<string[]>([""]);
 
   const [xHypothesis, setXHypothesis] = useState("");
   const [xDid, setXDid] = useState<string[]>([""]);
   const [xResult, setXResult] = useState<string[]>([""]);
   const [xDiscussion, setXDiscussion] = useState<string[]>([""]);
   const [xNextAction, setXNextAction] = useState<string[]>([""]);
-
   const [optCompare, setOptCompare] = useState<string[]>([""]);
   const [optUnexpected, setOptUnexpected] = useState<string[]>([""]);
   const [optXFailures, setOptXFailures] = useState<string[]>([""]);
@@ -391,6 +325,7 @@ export default function HomePage() {
   const [articleOutline, setArticleOutline] = useState<string[]>([]);
   const [generatedArticleMarkdown, setGeneratedArticleMarkdown] = useState("");
   const [articleModel, setArticleModel] = useState("");
+  const [resultTab, setResultTab] = useState<"prompt" | "article">("prompt");
 
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -398,54 +333,40 @@ export default function HomePage() {
   const [error, setError] = useState("");
   const [articleError, setArticleError] = useState("");
   const [notice, setNotice] = useState("");
-
+  const [copied, setCopied] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [dirty, setDirty] = useState(false);
-  const [showGuide, setShowGuide] = useState(false);
 
   useEffect(() => {
     setDeviceId(getOrCreateDeviceId());
+    const savedStep = Number(localStorage.getItem(STEP_KEY));
+    if (savedStep === 0 || savedStep === 1 || savedStep === 2) {
+      setStep(savedStep as Step);
+    }
+    const timer = window.setTimeout(() => setShowSplash(false), 3000);
+    return () => window.clearTimeout(timer);
   }, []);
 
-  const formLocked = loading || saving;
+  useEffect(() => {
+    localStorage.setItem(STEP_KEY, String(step));
+  }, [step]);
 
+  const formLocked = loading || saving;
   const hasAtLeastOne = (arr: string[]) => arr.some((x) => x.trim().length > 0);
 
   const canGenerate = (() => {
     if (formLocked) return false;
-    if (!theme.trim()) return false;
-    if (!articleType) return false;
-    if (!primaryGoal) return false;
-    if (!stylePreset) return false;
-
+    if (!theme.trim() || !articleType || !primaryGoal || !stylePreset) return false;
     if (articleType === "problem") {
-      if (!hasAtLeastOne(pProblem)) return false;
-      if (!hasAtLeastOne(pSolutions)) return false;
-      if (!pTodayAction.trim()) return false;
-      return true;
+      return hasAtLeastOne(pProblem) && hasAtLeastOne(pSolutions) && !!pTodayAction.trim();
     }
-
     if (articleType === "experience") {
-      if (!hasAtLeastOne(eEvent)) return false;
-      if (!hasAtLeastOne(eFeelings)) return false;
-      if (!hasAtLeastOne(eLearnings)) return false;
-      if (!eMessage.trim()) return false;
-      return true;
+      return hasAtLeastOne(eEvent) && hasAtLeastOne(eFeelings) && hasAtLeastOne(eLearnings) && !!eMessage.trim();
     }
-
-    if (articleType === "experiment") {
-      if (!xHypothesis.trim()) return false;
-      if (!hasAtLeastOne(xDid)) return false;
-      if (!hasAtLeastOne(xResult)) return false;
-      if (!hasAtLeastOne(xDiscussion)) return false;
-      return true;
-    }
-
-    return false;
+    return !!xHypothesis.trim() && hasAtLeastOne(xDid) && hasAtLeastOne(xResult) && hasAtLeastOne(xDiscussion);
   })();
 
-  const canSave =
-    !formLocked && !!historyId && !!generatedPrompt.trim() && isEditing && dirty;
+  const canSave = !formLocked && !!historyId && !!generatedPrompt.trim() && isEditing && dirty;
 
   const toggleTag = (tag: string) => {
     setTargetTags((prev) =>
@@ -454,21 +375,14 @@ export default function HomePage() {
   };
 
   const buildPayloadV10 = () => {
-    const base: any = {
+    const base: Record<string, unknown> = {
       theme,
       articleType,
       primaryGoal,
-      targets: {
-        tags: targetTags,
-        detail: targetDetail.trim(),
-      },
+      targets: { tags: targetTags, detail: targetDetail.trim() },
       authority: authority.trim(),
       stylePreset,
-      meta: {
-        deviceId,
-        templateId: "note-v10",
-        version: "0.2.0",
-      },
+      meta: { deviceId, templateId: "note-v10", version: "0.2.0" },
     };
 
     if (articleType === "problem") {
@@ -482,6 +396,7 @@ export default function HomePage() {
         },
       };
       base.optional = {
+        background: optBackground.filter((x) => x.trim()),
         evidence: optEvidence.filter((x) => x.trim()),
         failures: optFailures.filter((x) => x.trim()),
       };
@@ -499,9 +414,9 @@ export default function HomePage() {
         },
       };
       base.optional = {
+        background: optBackground.filter((x) => x.trim()),
         data: optData.filter((x) => x.trim()),
         failureDetails: optFailureDetails.filter((x) => x.trim()),
-        background: optBackground.filter((x) => x.trim()),
       };
     }
 
@@ -516,6 +431,7 @@ export default function HomePage() {
         },
       };
       base.optional = {
+        background: optBackground.filter((x) => x.trim()),
         compare: optCompare.filter((x) => x.trim()),
         failures: optXFailures.filter((x) => x.trim()),
         unexpected: optUnexpected.filter((x) => x.trim()),
@@ -538,26 +454,24 @@ export default function HomePage() {
     setGeneratedArticleMarkdown("");
     setArticleModel("");
     setArticleError("");
-    setShowGuide(false);
-  
+    setStep(2);
+    setResultTab("prompt");
+
     try {
       if (!apiBase) throw new Error("NEXT_PUBLIC_API_BASE is not set");
       if (!deviceId) throw new Error("deviceId is not ready");
-  
-      const payload = buildPayloadV10();
-  
       const res = await fetch(`${apiBase}/generate`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+        body: JSON.stringify(buildPayloadV10()),
       });
-  
+
       if (!res.ok) {
         const body = await readErrorBody(res);
         const hint = statusHint(res.status);
         throw new Error(
           [
-            `API Error`,
+            "API Error",
             `URL: ${res.url}`,
             `Status: ${res.status} ${res.statusText}`,
             body ? `Body:\n${body}` : "",
@@ -567,14 +481,13 @@ export default function HomePage() {
             .join("\n")
         );
       }
-  
+
       const data = await res.json();
       setGeneratedPrompt(data.generatedPrompt ?? "");
       setHistoryId(data.historyId ?? "");
-      setNotice("生成しました（履歴に保存済み）");
-      setShowGuide(true);
-    } catch (e: any) {
-      setError(e?.message ?? "Failed");
+      setNotice("生成しました。履歴にも保存されています。");
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Failed");
     } finally {
       setLoading(false);
     }
@@ -584,25 +497,21 @@ export default function HomePage() {
     setSaving(true);
     setError("");
     setNotice("");
-
     try {
       if (!apiBase) throw new Error("NEXT_PUBLIC_API_BASE is not set");
       if (!deviceId) throw new Error("deviceId is not ready");
-      if (!historyId) throw new Error("historyId is missing (generate first)");
-
-      const url = `${apiBase}/history/${historyId}`;
-      const res = await fetch(url, {
+      if (!historyId) throw new Error("historyId is missing");
+      const res = await fetch(`${apiBase}/history/${historyId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ deviceId, generatedPrompt }),
       });
-
       if (!res.ok) {
         const body = await readErrorBody(res);
         const hint = statusHint(res.status);
         throw new Error(
           [
-            `Save Error`,
+            "Save Error",
             `URL: ${res.url}`,
             `Status: ${res.status} ${res.statusText}`,
             body ? `Body:\n${body}` : "",
@@ -612,12 +521,11 @@ export default function HomePage() {
             .join("\n")
         );
       }
-
       setDirty(false);
       setIsEditing(false);
-      setNotice("上書き保存しました");
-    } catch (e: any) {
-      setError(e?.message ?? "Failed to save");
+      setNotice("上書き保存しました。");
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Failed to save");
     } finally {
       setSaving(false);
     }
@@ -625,14 +533,18 @@ export default function HomePage() {
 
   const handleCopy = async () => {
     await navigator.clipboard.writeText(generatedPrompt);
-    setNotice("コピーしました");
-    setTimeout(() => setNotice(""), 1500);
+    setCopied(true);
+    setNotice("コピーしました。");
+    window.setTimeout(() => {
+      setCopied(false);
+      setNotice("");
+    }, 1500);
   };
 
   const handleCopyArticle = async () => {
     await navigator.clipboard.writeText(generatedArticleMarkdown);
-    setNotice("記事本文をコピーしました");
-    setTimeout(() => setNotice(""), 1500);
+    setNotice("記事本文をコピーしました。");
+    window.setTimeout(() => setNotice(""), 1500);
   };
 
   const handleGenerateArticle = async () => {
@@ -643,18 +555,17 @@ export default function HomePage() {
     setArticleOutline([]);
     setGeneratedArticleMarkdown("");
     setArticleModel("");
+    setResultTab("article");
 
     try {
       if (!generatedPrompt.trim()) {
-        throw new Error("先にプロンプトを生成してください");
+        throw new Error("先にプロンプトを生成してください。");
       }
-
       const res = await fetch("/api/article/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ prompt: generatedPrompt }),
       });
-
       if (!res.ok) {
         const body = await readErrorBody(res);
         throw new Error(
@@ -667,655 +578,518 @@ export default function HomePage() {
             .join("\n")
         );
       }
-
       const data = await res.json();
-      setArticleTitleIdeas(
-        Array.isArray(data.titleIdeas) ? data.titleIdeas : []
-      );
+      setArticleTitleIdeas(Array.isArray(data.titleIdeas) ? data.titleIdeas : []);
       setArticleOutline(Array.isArray(data.outline) ? data.outline : []);
       setGeneratedArticleMarkdown(data.articleMarkdown ?? "");
       setArticleModel(data.model ?? "");
-      setNotice("記事本文を生成しました");
+      setNotice("記事本文を生成しました。");
     } catch (e: unknown) {
-      setArticleError(
-        e instanceof Error ? e.message : "Failed to generate article"
-      );
+      setArticleError(e instanceof Error ? e.message : "Failed to generate article");
     } finally {
       setArticleLoading(false);
     }
   };
 
-  return (
-    <main className={styles.page}>
-      <div className={styles.container}>
-        <header className={styles.header}>
-          <div className={styles.brand}>
-            <div className={styles.brandRow}>
-              <h1 className={styles.title}>Note Prompt Builder</h1>
-              <span className={styles.badge}>β</span>
-            </div>
-            <p className={styles.subtitle}>
-              note記事用のプロンプトを、型ベースで整理しながら作れるツールです。
-              まずは主目的と記事材料を絞り、迷わず書き始められる状態を作ります。
-            </p>
+  const stepDone = [
+    !!theme.trim(),
+    canGenerate || !!generatedPrompt,
+    !!generatedPrompt,
+  ];
+
+  const basicStep = (
+    <section className={styles.card}>
+      <div className={styles.sectionLabel}>Step 1 / 3</div>
+      <h2 className={styles.sectionTitle}>基本設定</h2>
+      <p className={styles.sectionSub}>
+        テーマ、記事の型、目的、読者、文体を先に固定します。
+      </p>
+
+      <Field label="記事テーマ" required>
+        <AutoResizeTextarea
+          className={styles.input}
+          value={theme}
+          onChange={(e) => setTheme(e.target.value)}
+          placeholder="例: note が継続できない原因と解決策"
+          minHeight={60}
+        />
+      </Field>
+
+      <div className={styles.divider} />
+
+      <Field label="記事の型">
+        <div className={styles.typeGrid}>
+          {ARTICLE_TYPES.map((type) => (
+            <button
+              key={type.id}
+              type="button"
+              className={`${styles.typeCard} ${
+                articleType === type.id ? styles.typeCardActive : ""
+              }`}
+              onClick={() => setArticleType(type.id)}
+            >
+              <span className={styles.typeIcon}>{type.icon}</span>
+              <span className={styles.typeTitle}>{type.title}</span>
+              <span className={styles.typeDesc}>{type.description}</span>
+            </button>
+          ))}
+        </div>
+      </Field>
+
+      <Field label="主目的">
+        <div className={styles.goalRow}>
+          {PRIMARY_GOALS.map((goal) => (
+            <button
+              key={goal.slug}
+              type="button"
+              className={`${styles.goalButton} ${
+                primaryGoal === goal.slug ? styles.goalButtonActive : ""
+              }`}
+              onClick={() => setPrimaryGoal(goal.slug)}
+            >
+              {goal.label}
+            </button>
+          ))}
+        </div>
+      </Field>
+
+      <Field label="想定読者" optional>
+        <div className={styles.chipRow}>
+          {TARGET_TAGS.map((tag) => (
+            <button
+              key={tag}
+              type="button"
+              className={`${styles.chip} ${
+                targetTags.includes(tag) ? styles.chipActive : ""
+              }`}
+              onClick={() => toggleTag(tag)}
+            >
+              {tag}
+            </button>
+          ))}
+        </div>
+        <AutoResizeTextarea
+          className={styles.input}
+          value={targetDetail}
+          onChange={(e) => setTargetDetail(e.target.value)}
+          placeholder="より具体的な読者像があれば入力"
+          minHeight={60}
+        />
+      </Field>
+
+      <Field label="権威性" hint="経験、実績、数字など" optional>
+        <AutoResizeTextarea
+          className={styles.input}
+          value={authority}
+          onChange={(e) => setAuthority(e.target.value)}
+          placeholder="例: 30記事検証 / PVの変化 / 実務経験"
+          minHeight={60}
+        />
+      </Field>
+
+      <Field label="文体">
+        <div className={styles.styleGrid}>
+          {STYLE_PRESET_OPTIONS.map((preset) => (
+            <button
+              key={preset.value}
+              type="button"
+              className={`${styles.styleCard} ${
+                stylePreset === preset.value ? styles.styleCardActive : ""
+              }`}
+              onClick={() => setStylePreset(preset.value)}
+            >
+              <span className={styles.styleName}>{preset.title}</span>
+              <span className={styles.styleDesc}>{preset.description}</span>
+            </button>
+          ))}
+        </div>
+      </Field>
+
+      <div className={styles.navRow}>
+        <button
+          className={styles.primaryButton}
+          onClick={() => setStep(1)}
+          disabled={!theme.trim()}
+        >
+          次へ: 記事素材を入力
+        </button>
+      </div>
+    </section>
+  );
+
+  const materialStep = (
+    <section className={styles.card}>
+      <div className={styles.sectionLabel}>Step 2 / 3</div>
+      <h2 className={styles.sectionTitle}>記事素材</h2>
+      <p className={styles.sectionSub}>
+        選んだ型に合わせて素材を入力します。必須項目を埋めると生成できます。
+      </p>
+
+      <div className={styles.subSection}>
+        {articleType === "problem" && (
+          <>
+            <BulletListInput
+              label="解決する問題"
+              value={pProblem}
+              onChange={setPProblem}
+              required
+              hint="読者が困っていること、悩み"
+              placeholder="例: note を続けたいのに3日で止まる"
+            />
+            <BulletListInput
+              label="あなたのエピソード"
+              value={pEpisode}
+              onChange={setPEpisode}
+              placeholder="例: 自分も最初の10本で手が止まった"
+            />
+            <BulletListInput
+              label="問題の原因"
+              value={pCause}
+              onChange={setPCause}
+              placeholder="例: テーマ決めと構成作りを同時にやっている"
+            />
+            <BulletListInput
+              label="解決手段"
+              value={pSolutions}
+              onChange={setPSolutions}
+              required
+              placeholder="例: 先に型を決めて素材だけ集める"
+            />
+            <Field label="今日やる行動" required>
+              <AutoResizeTextarea
+                className={styles.input}
+                value={pTodayAction}
+                onChange={(e) => setPTodayAction(e.target.value)}
+                placeholder="例: まず記事テーマを3つ書き出す"
+                minHeight={60}
+              />
+            </Field>
+          </>
+        )}
+
+        {articleType === "experience" && (
+          <>
+            <BulletListInput
+              label="出来事"
+              value={eEvent}
+              onChange={setEEvent}
+              required
+              placeholder="例: 30日連続で投稿した"
+            />
+            <BulletListInput
+              label="感情・状況"
+              value={eFeelings}
+              onChange={setEFeelings}
+              required
+              placeholder="例: 最初は毎日不安だった"
+            />
+            <BulletListInput
+              label="気づき"
+              value={eInsight}
+              onChange={setEInsight}
+              placeholder="例: 完璧さより投稿の型が大事だった"
+            />
+            <BulletListInput
+              label="学び"
+              value={eLearnings}
+              onChange={setELearnings}
+              required
+              placeholder="例: 先に結論を書くと迷いにくい"
+            />
+            <Field label="読者への問い" optional>
+              <AutoResizeTextarea
+                className={styles.input}
+                value={eQuestion}
+                onChange={(e) => setEQuestion(e.target.value)}
+                placeholder="例: あなたが続かない理由は何ですか？"
+                minHeight={60}
+              />
+            </Field>
+            <Field label="メッセージ" required>
+              <AutoResizeTextarea
+                className={styles.input}
+                value={eMessage}
+                onChange={(e) => setEMessage(e.target.value)}
+                placeholder="例: 小さく始めれば継続は作れる"
+                minHeight={60}
+              />
+            </Field>
+          </>
+        )}
+
+        {articleType === "experiment" && (
+          <>
+            <Field label="仮説" required>
+              <AutoResizeTextarea
+                className={styles.input}
+                value={xHypothesis}
+                onChange={(e) => setXHypothesis(e.target.value)}
+                placeholder="例: 記事の型を固定すると投稿が続く"
+                minHeight={60}
+              />
+            </Field>
+            <BulletListInput
+              label="やったこと"
+              value={xDid}
+              onChange={setXDid}
+              required
+              placeholder="例: 3つの型だけで10本書いた"
+            />
+            <BulletListInput
+              label="結果・現状"
+              value={xResult}
+              onChange={setXResult}
+              required
+              placeholder="例: 投稿頻度が週1から週3になった"
+            />
+            <BulletListInput
+              label="考察"
+              value={xDiscussion}
+              onChange={setXDiscussion}
+              required
+              placeholder="例: 迷う工程が減って作業時間が短くなった"
+            />
+            <BulletListInput
+              label="次にやること"
+              value={xNextAction}
+              onChange={setXNextAction}
+              placeholder="例: タイトル型も固定する"
+            />
+          </>
+        )}
+      </div>
+
+      <button
+        type="button"
+        onClick={() => setShowOptional((v) => !v)}
+        className={`${styles.optionalToggle} ${
+          showOptional ? styles.optionalToggleOpen : ""
+        }`}
+      >
+        <span>任意項目を追加</span>
+        <span className={styles.optionalText}>根拠、背景、失敗例など</span>
+        <span className={styles.optionalArrow}>v</span>
+      </button>
+
+      {showOptional && (
+        <div className={styles.optionalBody}>
+          <BulletListInput
+            label="背景"
+            value={optBackground}
+            onChange={setOptBackground}
+            placeholder="例: 副業として note を始めた"
+          />
+          {articleType === "problem" && (
+            <>
+              <BulletListInput
+                label="根拠"
+                value={optEvidence}
+                onChange={setOptEvidence}
+                placeholder="例: 50記事投稿で検証した"
+              />
+              <BulletListInput
+                label="失敗例"
+                value={optFailures}
+                onChange={setOptFailures}
+                placeholder="例: AIに丸投げすると薄い記事になった"
+              />
+            </>
+          )}
+          {articleType === "experience" && (
+            <>
+              <BulletListInput
+                label="データ"
+                value={optData}
+                onChange={setOptData}
+                placeholder="例: PV500、保存数20"
+              />
+              <BulletListInput
+                label="失敗"
+                value={optFailureDetails}
+                onChange={setOptFailureDetails}
+                placeholder="例: テーマを広げすぎて読者がぼやけた"
+              />
+            </>
+          )}
+          {articleType === "experiment" && (
+            <>
+              <BulletListInput
+                label="比較"
+                value={optCompare}
+                onChange={setOptCompare}
+                placeholder="例: 以前は1本に3時間かかっていた"
+              />
+              <BulletListInput
+                label="失敗例"
+                value={optXFailures}
+                onChange={setOptXFailures}
+                placeholder="例: 型を細かくしすぎると窮屈だった"
+              />
+              <BulletListInput
+                label="想定外"
+                value={optUnexpected}
+                onChange={setOptUnexpected}
+                placeholder="例: コメントが増えた"
+              />
+            </>
+          )}
+        </div>
+      )}
+
+      <div className={styles.navRow}>
+        <button className={styles.ghostButton} onClick={() => setStep(0)}>
+          戻る
+        </button>
+        <button
+          className={styles.primaryButton}
+          onClick={handleGenerate}
+          disabled={!canGenerate || loading}
+        >
+          {loading ? "生成中..." : "プロンプト生成"}
+        </button>
+      </div>
+      {error && <pre className={styles.errorBox}>{error}</pre>}
+    </section>
+  );
+
+  const resultStep = (
+    <section className={styles.card}>
+      <div className={styles.sectionLabel}>Step 3 / 3</div>
+      <h2 className={styles.sectionTitle}>生成結果</h2>
+
+      {loading && (
+        <div className={styles.skeletonBox}>
+          <div className={styles.skeletonText}>生成中です。数秒かかります。</div>
+          <div className={styles.skeletonLine} />
+          <div className={styles.skeletonLineShort} />
+          <div className={styles.skeletonLineTiny} />
+        </div>
+      )}
+
+      {!loading && !generatedPrompt && (
+        <div className={styles.emptyState}>
+          <div className={styles.emptyIcon}>+</div>
+          <p>まだ生成されていません。</p>
+          <button className={styles.secondaryButton} onClick={() => setStep(1)}>
+            素材を入力する
+          </button>
+        </div>
+      )}
+
+      {!loading && generatedPrompt && (
+        <div className={styles.resultPanel}>
+          <div className={styles.resultToolbar}>
+            <button
+              className={styles.secondaryButton}
+              onClick={() => setIsEditing((v) => !v)}
+            >
+              {isEditing ? "編集を終了" : "編集する"}
+            </button>
+            <button
+              className={`${styles.secondaryButton} ${
+                copied ? styles.copiedFlash : ""
+              }`}
+              onClick={handleCopy}
+            >
+              {copied ? "コピー済み" : "コピー"}
+            </button>
+            <button
+              className={styles.externalButton}
+              onClick={() => window.open("https://chat.openai.com", "_blank")}
+            >
+              ChatGPT
+            </button>
+            <button
+              className={styles.externalButton}
+              onClick={() => window.open("https://gemini.google.com", "_blank")}
+            >
+              Gemini
+            </button>
+            <span className={styles.toolbarSpacer} />
+            <button
+              className={styles.greenButton}
+              onClick={handleGenerateArticle}
+              disabled={articleLoading || !generatedPrompt.trim()}
+            >
+              {articleLoading ? "生成中..." : "記事本文を生成"}
+            </button>
+            <button
+              className={styles.secondaryButton}
+              onClick={handleSaveOverwrite}
+              disabled={!canSave}
+            >
+              {saving ? "保存中..." : "上書き保存"}
+            </button>
           </div>
 
-          <div className={styles.headerActions}>
-            <Link href="/history" className={styles.linkButton}>
-              履歴を見る →
-            </Link>
+          <textarea
+            className={`${styles.resultTextarea} ${
+              isEditing ? styles.resultEditable : styles.resultReadonly
+            }`}
+            value={generatedPrompt}
+            readOnly={!isEditing}
+            onChange={(e) => {
+              setGeneratedPrompt(e.target.value);
+              setDirty(true);
+            }}
+          />
+
+          <div className={styles.resultMeta}>
+            historyId: {historyId || "-"} / deviceId:{" "}
+            {deviceId ? `${deviceId.slice(0, 8)}...` : "..."} / templateId:
+            note-v10
           </div>
-        </header>
 
-        <section className={styles.heroCard}>
-          <h2 className={styles.heroTitle}>構造から考える、記事プロンプト作成</h2>
-          <p className={styles.heroText}>
-            自由記述で毎回ゼロから悩むのではなく、記事の型と材料を先に整理して、
-            AIに渡すプロンプトの精度を上げることを目的にした設計です。
-          </p>
-        </section>
+          {notice && <div className={styles.noticeBox}>{notice}</div>}
+          {error && <pre className={styles.errorBox}>{error}</pre>}
+          {articleError && <pre className={styles.errorBox}>{articleError}</pre>}
 
-        <div className={styles.layoutGrid}>
-          <div className={styles.mainCard}>
-            <section className={styles.cardSection}>
-              <div className={styles.sectionHeader}>
-                <h2 className={styles.sectionTitle}>基本設定</h2>
-                <p className={styles.sectionDescription}>
-                  まず記事テーマ・型・主目的・読者を決めます。ここが曖昧だと、
-                  生成されるプロンプト全体の精度が落ちます。
-                </p>
+          {(articleLoading || generatedArticleMarkdown) && (
+            <div className={styles.articlePanel}>
+              <div className={styles.tabBar}>
+                <button
+                  className={`${styles.tab} ${
+                    resultTab === "prompt" ? styles.tabActive : ""
+                  }`}
+                  onClick={() => setResultTab("prompt")}
+                >
+                  プロンプト
+                </button>
+                <button
+                  className={`${styles.tab} ${
+                    resultTab === "article" ? styles.tabActive : ""
+                  }`}
+                  onClick={() => setResultTab("article")}
+                >
+                  記事本文
+                </button>
               </div>
-
-              <div
-                className={styles.formArea}
-                style={{
-                  opacity: formLocked ? 0.6 : 1,
-                  pointerEvents: formLocked ? "none" : "auto",
-                }}
-              >
-                <div>
-                  <label className={styles.label}>記事テーマ（必須）</label>
-                  <textarea
-                    className={`${styles.textArea} ${styles.textAreaSm}`}
-                    value={theme}
-                    onChange={(e) => setTheme(e.target.value)}
-                    placeholder="例：noteが継続できない原因／プロンプト設計のコツ"
-                  />
-                </div>
-
-                <div>
-                  <label className={styles.label}>記事の型（必須）</label>
-                  <p className={styles.helpText}>
-                    記事の流れを先に固定して、入力の負担と出力のブレを減らします。
-                  </p>
-                  <div className={styles.typeCardGrid}>
-                    <button
-                      type="button"
-                      onClick={() => setArticleType("problem")}
-                      className={`${styles.typeCard} ${
-                        articleType === "problem" ? styles.typeCardActive : ""
-                      }`}
-                    >
-                      <div className={styles.typeCardTitle}>問題解決型</div>
-                      <div className={styles.typeCardText}>
-                        課題を整理して、原因と解決策を順序立てて伝える型です。
-                      </div>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => setArticleType("experience")}
-                      className={`${styles.typeCard} ${
-                        articleType === "experience" ? styles.typeCardActive : ""
-                      }`}
-                    >
-                      <div className={styles.typeCardTitle}>体験共有型</div>
-                      <div className={styles.typeCardText}>
-                        出来事や感情の変化から、学びや気づきを伝える型です。
-                      </div>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => setArticleType("experiment")}
-                      className={`${styles.typeCard} ${
-                        articleType === "experiment" ? styles.typeCardActive : ""
-                      }`}
-                    >
-                      <div className={styles.typeCardTitle}>実験ログ型</div>
-                      <div className={styles.typeCardText}>
-                        仮説・実施・結果・考察を整理して記録する型です。
-                      </div>
-                    </button>
-                  </div>
-                </div>
-
-                <div>
-                  <label className={styles.label}>主目的（必須・1つ）</label>
-                  <p className={styles.helpText}>
-                    🎯 主目的は1つに絞ると、記事の精度が上がります。
-                  </p>
-                  <div className={styles.goalButtonGroup}>
-                    {PRIMARY_GOALS.map((g) => (
-                      <button
-                        key={g.slug}
-                        type="button"
-                        onClick={() => setPrimaryGoal(g.slug)}
-                        className={`${styles.goalButton} ${
-                          primaryGoal === g.slug ? styles.goalButtonActive : ""
-                        }`}
-                      >
-                        {g.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div>
-                  <label className={styles.label}>想定読者（タグ選択 + 任意追記）</label>
-                  <div className={styles.chipRow}>
-                    {TARGET_TAGS.map((t) => (
-                      <Chip
-                        key={t}
-                        label={t}
-                        active={targetTags.includes(t)}
-                        onClick={() => toggleTag(t)}
-                      />
-                    ))}
-                  </div>
-                  <AutoResizeTextarea
-                    className={`${styles.textArea} ${styles.textAreaSm}`}
-                    value={targetDetail}
-                    onChange={(e) => setTargetDetail(e.target.value)}
-                    placeholder="任意：より具体的に（例：0〜10記事投稿済み、収益化に焦っている など）"
-                    minHeight={74}
-                  />
-                </div>
-
-                <div>
-                  <div className={styles.fieldHeader}>
-                    <label className={styles.label}>権威性（任意）</label>
-                    <div className={styles.tooltipWrap}>
-                      <button
-                        type="button"
-                        className={styles.tooltipButton}
-                        title="説明を見る"
-                        aria-label="権威性の説明を表示"
-                      >
-                        ?
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className={styles.fieldHint}>
-                    経験・実績・数字など、説得力になる要素
-                  </div>
-
-                  <div className={styles.tooltipBox} style={{ display: "none" }}>
-                    TODO
-                  </div>
-
-                  <textarea
-                    className={`${styles.textArea} ${styles.textAreaSm}`}
-                    value={authority}
-                    onChange={(e) => setAuthority(e.target.value)}
-                    placeholder="例：50記事検証／PVや成約の数字／一次情報／実務経験"
-                  />
-                </div>
-                <div>
-                  <label className={styles.label}>文体</label>
-                  <div className={styles.styleCardGrid}>
-                    {STYLE_PRESET_OPTIONS.map((opt) => (
-                      <button
-                        key={opt.value}
-                        type="button"
-                        onClick={() => setStylePreset(opt.value)}
-                        className={`${styles.styleCard} ${
-                          stylePreset === opt.value ? styles.styleCardActive : ""
-                        }`}
-                      >
-                        <div className={styles.styleCardTitle}>{opt.title}</div>
-                        <div className={styles.styleCardText}>{opt.description}</div>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </section>
-
-            <section className={styles.cardSection}>
-              <div className={styles.sectionHeader}>
-                <h2 className={styles.sectionTitle}>記事材料</h2>
-                <p className={styles.sectionDescription}>
-                  型に応じて必要な材料だけを入力します。必須項目が揃っていないと、
-                  実用的なプロンプトになりません。
-                </p>
-              </div>
-
-              <div
-                className={styles.formArea}
-                style={{
-                  opacity: formLocked ? 0.6 : 1,
-                  pointerEvents: formLocked ? "none" : "auto",
-                }}
-              >
-                {articleType === "problem" && (
-                  <div className={styles.subCard}>
-                    <h3 className={styles.subCardTitle}>記事材料（問題解決）</h3>
-                    <div className={styles.fieldGroup}>
-                      <BulletListInput
-                        label="解決する問題"
-                        value={pProblem}
-                        onChange={setPProblem}
-                        requiredAtLeastOne
-                        hint="読者が困っていること・悩み"
-                        placeholder="例：毎回ゼロから考えて疲れる"
-                        tooltip="読者が「それ自分のことだ」と感じる内容にしましょう"
-                      />
-                      <BulletListInput
-                        label="あなたのエピソード"
-                        value={pEpisode}
-                        onChange={setPEpisode}
-                        hint="その問題を実際に経験した出来事"
-                        placeholder="例：3日連続で記事を書こうとして挫折した"
-                      />
-                      <BulletListInput
-                        label="問題の原因（任意）"
-                        value={pCause}
-                        onChange={setPCause}
-                        hint="なぜその問題が起きるのか"
-                        placeholder="例：ネタのストック方法がない"
-                      />
-                      <BulletListInput
-                        label="解決手段"
-                        value={pSolutions}
-                        onChange={setPSolutions}
-                        requiredAtLeastOne
-                        hint="あなたが有効だと感じた、実際に有効だった方法"
-                        placeholder="例：構造を固定する"
-                      />
-                      <DetailsRow
-                        label="今日やる行動（必須）"
-                        value={pTodayAction}
-                        onChange={setPTodayAction}
-                        hint="読者が今日すぐ試せること"
-                        placeholder="例：型を1つ決めて見出しだけ作る"
-                      />
-                    </div>
-                  </div>
-                )}
-
-                {articleType === "experience" && (
-                  <div className={styles.subCard}>
-                    <h3 className={styles.subCardTitle}>記事材料（体験共有）</h3>
-                    <div className={styles.fieldGroup}>
-                      <BulletListInput
-                        label="出来事"
-                        value={eEvent}
-                        onChange={setEEvent}
-                        requiredAtLeastOne
-                        hint="実際に起きた出来事、体験したこと"
-                        placeholder="初めてnoteを30日連続投稿した"
-                      />
-                      <BulletListInput
-                        label="感情・状況"
-                        value={eFeelings}
-                        onChange={setEFeelings}
-                        requiredAtLeastOne
-                        hint="そのときの気持ちや自分の状況"
-                        placeholder="最初は何を書けばいいか分からなかった"
-                      />
-                      <BulletListInput
-                        label="気づき"
-                        value={eInsight}
-                        onChange={setEInsight}
-                        hint="その瞬間に感じたこと。まだ整理されていない、直感的な発見でも構いません。"
-                        placeholder="続けられないのは意志の問題ではない"
-                      />
-                      <BulletListInput
-                        label="学び（必須）"
-                        value={eLearnings}
-                        onChange={setELearnings}
-                        requiredAtLeastOne
-                        hint="他の人にも再現できる教訓"
-                        placeholder="例：継続には仕組みが必要"
-                      />
-                      <DetailsRow
-                        label="問い（任意）"
-                        value={eQuestion}
-                        onChange={setEQuestion}
-                        hint="読者に投げかける質問"
-                        placeholder="例：あなたはなぜ続かないと思いますか？"
-                        tooltip="記事の途中や最後で使う「読者への問い」です。読者に考えさせたり共感を引き出す役割があります。"
-                      />
-                      <DetailsRow
-                        label="メッセージ（必須）"
-                        value={eMessage}
-                        onChange={setEMessage}
-                        hint="あなたの体験から一番伝えたいこと"
-                        placeholder="例：継続は才能ではなく設計です"
-                        tooltip="記事の結論や締めくくりに使う一文です。読者に残したい核心のメッセージを書きます。"
-                      />
-                    </div>
-                  </div>
-                )}
-
-                {articleType === "experiment" && (
-                  <div className={styles.subCard}>
-                    <h3 className={styles.subCardTitle}>記事材料（実験ログ）</h3>
-                    <div className={styles.fieldGroup}>
-                      <div>
-                        <label className={styles.label}>仮説（必須）</label>
-                        <textarea
-                          className={`${styles.textArea} ${styles.textAreaSm}`}
-                          value={xHypothesis}
-                          onChange={(e) => setXHypothesis(e.target.value)}
-                          placeholder="例：記事の型を固定すると投稿が続く"
-                        />
-                      </div>
-                      <BulletListInput
-                        label="やったこと、やっていること、これからやろうと思っていること"
-                        value={xDid}
-                        onChange={setXDid}
-                        requiredAtLeastOne
-                        placeholder="例：記事テンプレートを作成した"
-                      />
-                      <BulletListInput
-                        label="結果、現状、見込まれる結果"
-                        value={xResult}
-                        onChange={setXResult}
-                        requiredAtLeastOne
-                        placeholder="例：投稿頻度が週1→週3になった"
-                      />
-                      <BulletListInput
-                        label="考察"
-                        value={xDiscussion}
-                        onChange={setXDiscussion}
-                        requiredAtLeastOne
-                        hint="結果、現状、見込みの理由の分析。仮説との関係も考える"
-                        placeholder="例：構造が決まると迷いが減って時間が削減できる"
-                      />
-                      <BulletListInput
-                        label="次にやること（任意）"
-                        value={xNextAction}
-                        onChange={setXNextAction}
-                        placeholder="例：タイトル構造を変える"
-                      />
-                    </div>
-                  </div>
-                )}
-              </div>
-            </section>
-
-            <section className={styles.cardSection}>
-              <div className={styles.sectionHeader}>
-                <h2 className={styles.sectionTitle}>任意項目</h2>
-                <p className={styles.sectionDescription}>
-                  数字・根拠・失敗・背景など、精度や説得力を上げたい時だけ追加します。
-                </p>
-              </div>
-
-              <div
-                className={styles.formArea}
-                style={{
-                  opacity: formLocked ? 0.6 : 1,
-                  pointerEvents: formLocked ? "none" : "auto",
-                }}
-              >
-                <div className={styles.subCard}>
-                  <button
-                    type="button"
-                    onClick={() => setShowOptional((v) => !v)}
-                    className={styles.secondaryButton}
-                  >
-                    {showOptional
-                      ? "任意項目を閉じる"
-                      : "任意項目（根拠/失敗など）を開く"}
-                  </button>
-
-                  {showOptional && (
-                    <div className={styles.fieldGroup} style={{ marginTop: 16 }}>
-                      {articleType === "problem" && (
-                        <>
-                          <BulletListInput
-                            label="背景（任意）"
-                            value={optBackground}
-                            onChange={setOptBackground}
-                            hint="この記事、あなたの前提情報"
-                            placeholder="例：副業として稼ぐためにnoteを始めた、いままでAIに関する記事を書いてきた"
-                          />
-                          <BulletListInput
-                            label="根拠（任意）"
-                            value={optEvidence}
-                            onChange={setOptEvidence}
-                            hint="解決策が有効だと思う理由"
-                            placeholder="例：この方法で50記事毎日投稿できた書いた"
-                            tooltip="データ・経験・検証結果など、「なぜこの方法が有効なのか」を補強する材料です。"
-                          />
-                          <BulletListInput
-                            label="失敗例（任意）"
-                            value={optFailures}
-                            onChange={setOptFailures}
-                            hint="うまくいかなかったこと"
-                            placeholder="例：AIに丸投げすると記事が薄くなった"
-                            tooltip="失敗例を書くことで、読者が同じ遠回りをしないようにできます。"
-                          />
-                        </>
-                      )}
-
-                      {articleType === "experience" && (
-                        <>
-                          <BulletListInput
-                            label="背景（任意）"
-                            value={optBackground}
-                            onChange={setOptBackground}
-                            hint="この記事、あなたの前提情報"
-                            placeholder="例：副業として稼ぐためにnoteを始めた、いままでAIに関する記事を書いてきた"
-                          />
-                          <BulletListInput
-                            label="データ（任意）"
-                            value={optData}
-                            onChange={setOptData}
-                            hint="数字・統計・実績など、体験を客観的に補強する情報"
-                            placeholder="例：平均PV500、30記事投稿"
-                          />
-                          <BulletListInput
-                            label="失敗（任意）"
-                            value={optFailureDetails}
-                            onChange={setOptFailureDetails}
-                            hint="うまくいかなかった過程"
-                            placeholder="例：AIに丸投げすると記事が薄くなった"
-                            tooltip="失敗例を書くことで、読者が同じ遠回りをしないようにできます。"
-                          />
-                        </>
-                      )}
-
-                      {articleType === "experiment" && (
-                        <>
-                          <BulletListInput
-                            label="背景（任意）"
-                            value={optBackground}
-                            onChange={setOptBackground}
-                            hint="この記事、あなたの前提情報"
-                            placeholder="例：副業として稼ぐためにnoteを始めた、いままでAIに関する記事を書いてきた"
-                          />
-                          <BulletListInput
-                            label="比較（任意）"
-                            value={optCompare}
-                            onChange={setOptCompare}
-                            hint="他の方法、考えとの違い"
-                            placeholder="例：一から記事を書く方法"
-                            tooltip="他の方法や以前の状態と比較して、結果の違いを書きます"
-                          />
-                          <BulletListInput
-                            label="失敗例（任意）"
-                            value={optXFailures}
-                            onChange={setOptXFailures}
-                            hint="うまくいかなかった試み"
-                            placeholder="例：AIに丸投げすると記事が薄くなった"
-                            tooltip="失敗例を書くことで、読者が同じ遠回りをしないようにできます。"
-                          />
-                          <BulletListInput
-                            label="想定外（任意）"
-                            value={optUnexpected}
-                            onChange={setOptUnexpected}
-                            hint="予想外の発見、気づき"
-                            placeholder="例：記事の書く時間が半分になった"
-                          />
-                        </>
-                      )}
-                    </div>
-                  )}
-                </div>
-              </div>
-            </section>
-
-            <section className={styles.cardSection}>
-              <button
-                onClick={handleGenerate}
-                disabled={!canGenerate}
-                className={styles.primaryButton}
-              >
-                {loading ? "生成中..." : "プロンプト生成"}
-              </button>
-
-              {notice && <div className={styles.noticeBox}>{notice}</div>}
-
-              {error && <pre className={styles.errorBox}>{error}</pre>}
-            </section>
-
-            <section className={styles.cardSection}>
-              <div className={styles.sectionHeader}>
-                <h2 className={styles.sectionTitle}>生成結果</h2>
-                <p className={styles.sectionDescription}>
-                  生成されたプロンプトはそのままコピーできます。必要なら編集して上書き保存してください。
-                </p>
-              </div>
-
-              {loading && (
-                <div className={styles.skeletonBox}>
-                  <div className={styles.skeletonText}>
-                    生成中…（数秒かかります）
-                  </div>
-                  <div className={styles.skeletonLine} />
-                  <div className={styles.skeletonLine} style={{ width: "88%" }} />
-                  <div className={styles.skeletonLine} style={{ width: "72%" }} />
-                </div>
-              )}
-
-              {!loading && !generatedPrompt && (
-                <p className={styles.sectionDescription}>
-                  まだ生成結果がありません。入力して「プロンプト生成」を押してください。
-                </p>
-              )}
-
-              {!loading && generatedPrompt && (
-                <div className={styles.resultCard}>
-                  <div className={styles.resultToolbar}>
-                    <button
-                      onClick={() => setIsEditing((v) => !v)}
-                      className={styles.secondaryButton}
-                    >
-                      {isEditing ? "編集を終了" : "編集モード"}
-                    </button>
-
-                    <button
-                      onClick={handleCopy}
-                      disabled={!generatedPrompt.trim()}
-                      className={styles.secondaryButton}
-                    >
-                      コピー
-                    </button>
-                    <button
-                      onClick={() => window.open("https://chat.openai.com", "_blank")}
-                      className={styles.linkButton}
-                    >
-                      ChatGPT
-                    </button>
-
-                    <button
-                      onClick={() => window.open("https://gemini.google.com", "_blank")}
-                      className={styles.linkButton}
-                    >
-                      Gemini
-                    </button>
-
-                    <button
-                      onClick={handleGenerateArticle}
-                      disabled={articleLoading || !generatedPrompt.trim()}
-                      className={styles.successButton}
-                    >
-                      {articleLoading ? "記事生成中..." : "記事本文を生成"}
-                    </button>
-
-                    <div className={styles.resultToolbarSpacer} />
-
-                    <button
-                      onClick={handleSaveOverwrite}
-                      disabled={!canSave}
-                      className={styles.successButton}
-                      title={
-                        !historyId
-                          ? "先に生成して履歴IDを作ってください"
-                          : !isEditing
-                          ? "編集モードをONにしてください"
-                          : !dirty
-                          ? "編集内容がありません"
-                          : ""
-                      }
-                    >
-                      {saving ? "保存中..." : "上書き保存"}
-                    </button>
-                  </div>
-
-                  <textarea
-                    className={styles.resultAreaSoft}
-                    value={generatedPrompt}
-                    readOnly={!isEditing}
-                    onChange={(e) => {
-                      setGeneratedPrompt(e.target.value);
-                      setDirty(true);
-                    }}
-                  />
-
-                  <div className={styles.resultMeta}>
-                    historyId: {historyId || "（未生成）"} / deviceId:{" "}
-                    {deviceId || "..."} / templateId: note-v10
-                  </div>
-                </div>
-              )}
-              {articleError && <pre className={styles.errorBox}>{articleError}</pre>}
 
               {articleLoading && (
                 <div className={styles.skeletonBox}>
-                  <div className={styles.skeletonText}>
-                    記事本文を生成中です...
-                  </div>
+                  <div className={styles.skeletonText}>記事本文を生成中です。</div>
                   <div className={styles.skeletonLine} />
-                  <div className={styles.skeletonLine} style={{ width: "88%" }} />
-                  <div className={styles.skeletonLine} style={{ width: "72%" }} />
+                  <div className={styles.skeletonLineShort} />
+                  <div className={styles.skeletonLineTiny} />
                 </div>
               )}
 
-              {!articleLoading && generatedArticleMarkdown && (
-                <div className={styles.resultCard} style={{ marginTop: 18 }}>
-                  <div className={styles.resultToolbar}>
+              {!articleLoading && generatedArticleMarkdown && resultTab === "article" && (
+                <>
+                  <div className={styles.articleToolbar}>
                     <button
-                      onClick={handleCopyArticle}
-                      disabled={!generatedArticleMarkdown.trim()}
                       className={styles.secondaryButton}
+                      onClick={handleCopyArticle}
                     >
                       記事本文をコピー
                     </button>
-                    <div className={styles.resultToolbarSpacer} />
-                    <div className={styles.resultMeta}>
+                    <span className={styles.resultMeta}>
                       article model: {articleModel || "unknown"}
-                    </div>
+                    </span>
                   </div>
-
-                  <div className={styles.articleOutputGrid}>
+                  <div className={styles.articleGrid}>
                     <div className={styles.articleInfoCard}>
-                      <h3 className={styles.articleInfoTitle}>記事タイトル案</h3>
+                      <h3 className={styles.articleInfoTitle}>タイトル案</h3>
                       {articleTitleIdeas.length > 0 ? (
                         <ul className={styles.articleInfoList}>
                           {articleTitleIdeas.map((title, idx) => (
@@ -1326,9 +1100,8 @@ export default function HomePage() {
                         <p className={styles.articleInfoEmpty}>タイトル案はありません。</p>
                       )}
                     </div>
-
                     <div className={styles.articleInfoCard}>
-                      <h3 className={styles.articleInfoTitle}>記事構成案</h3>
+                      <h3 className={styles.articleInfoTitle}>構成案</h3>
                       {articleOutline.length > 0 ? (
                         <ol className={styles.articleInfoList}>
                           {articleOutline.map((heading, idx) => (
@@ -1340,48 +1113,115 @@ export default function HomePage() {
                       )}
                     </div>
                   </div>
-
                   <div className={styles.articleBodyGrid}>
                     <div>
-                      <h3 className={styles.articleInfoTitle}>記事本文 Markdown</h3>
+                      <h3 className={styles.articleInfoTitle}>Markdown</h3>
                       <textarea
-                        className={styles.resultAreaSoft}
+                        className={styles.resultTextarea}
                         value={generatedArticleMarkdown}
-                        onChange={(e) =>
-                          setGeneratedArticleMarkdown(e.target.value)
-                        }
+                        onChange={(e) => setGeneratedArticleMarkdown(e.target.value)}
                       />
                     </div>
-
                     <div>
-                      <h3 className={styles.articleInfoTitle}>Markdownプレビュー</h3>
+                      <h3 className={styles.articleInfoTitle}>プレビュー</h3>
                       <MarkdownPreview markdown={generatedArticleMarkdown} />
                     </div>
                   </div>
-                </div>
+                </>
               )}
-              {showGuide && (
-                <div className={styles.guideOverlay}>
-                  <div className={styles.guideModal}>
-                    <button
-                      className={styles.guideClose}
-                      onClick={() => setShowGuide(false)}
-                    >
-                      ×
-                    </button>
-
-                    <img
-                      src="/how-to-use-note-prompt-builder.png"
-                      alt="使い方"
-                      className={styles.guideImage}
-                    />
-                  </div>
-                </div>
-              )}
-            </section>
-          </div>
+            </div>
+          )}
         </div>
+      )}
+
+      <div className={styles.navRow}>
+        <button className={styles.ghostButton} onClick={() => setStep(1)}>
+          素材に戻る
+        </button>
+        {!loading && !generatedPrompt && (
+          <button
+            className={styles.primaryButton}
+            onClick={handleGenerate}
+            disabled={!canGenerate}
+          >
+            プロンプト生成
+          </button>
+        )}
       </div>
-    </main>
+    </section>
+  );
+
+  return (
+    <>
+      {showSplash && (
+        <div className={styles.splash}>
+          <div className={styles.splashIcon}>
+            <Image
+              src="/favicon.png"
+              alt=""
+              width={80}
+              height={80}
+              priority
+              className={styles.splashImage}
+            />
+          </div>
+          <svg className={styles.splashTitle} viewBox="0 0 620 90" role="img">
+            <text x="310" y="62" textAnchor="middle">
+              Note Prompt Builder
+            </text>
+          </svg>
+          <div className={styles.splashSub}>記事のプロンプトを構造から作る</div>
+        </div>
+      )}
+
+      <main className={`${styles.page} ${showSplash ? "" : styles.pageVisible}`}>
+        <div className={styles.container}>
+          <header className={styles.header}>
+            <div>
+              <div className={styles.brandRow}>
+                <div className={styles.logoBadge}>N</div>
+                <h1 className={styles.appTitle}>Note Prompt Builder</h1>
+                <span className={styles.appBadge}>BETA</span>
+              </div>
+              <p className={styles.headerSubtitle}>
+                記事の型と素材を整理して、AI へのプロンプト精度を上げるツール
+              </p>
+            </div>
+            <div className={styles.headerActions}>
+              {generatedPrompt && (
+                <button className={styles.headerPrimary} onClick={() => setStep(2)}>
+                  生成結果を見る
+                </button>
+              )}
+              <Link href="/history" className={styles.headerLink}>
+                履歴
+              </Link>
+            </div>
+          </header>
+
+          <div className={styles.stepBar}>
+            {STEPS.map((label, index) => (
+              <button
+                key={label}
+                type="button"
+                className={`${styles.stepItem} ${
+                  step === index ? styles.stepItemActive : ""
+                } ${stepDone[index] && step !== index ? styles.stepItemDone : ""}`}
+                onClick={() => setStep(index as Step)}
+              >
+                <span className={styles.stepNum}>
+                  {stepDone[index] && step !== index ? "OK" : index + 1}
+                </span>
+                <span>{label}</span>
+              </button>
+            ))}
+          </div>
+
+          {step === 0 && basicStep}
+          {step === 1 && materialStep}
+          {step === 2 && resultStep}
+        </div>
+      </main>
+    </>
   );
 }
