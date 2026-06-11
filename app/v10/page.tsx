@@ -352,7 +352,7 @@ export default function V10Page() {
   };
 
   const buildPayloadV10 = () => {
-    const base: any = {
+    const base: Record<string, unknown> = {
       theme,
       articleType,
       primaryGoal,
@@ -465,8 +465,8 @@ export default function V10Page() {
       setGeneratedPrompt(data.generatedPrompt ?? "");
       setHistoryId(data.historyId ?? "");
       setNotice("生成しました（履歴に保存済み）");
-    } catch (e: any) {
-      setError(e?.message ?? "Failed");
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Failed");
     } finally {
       setLoading(false);
     }
@@ -508,8 +508,8 @@ export default function V10Page() {
       setDirty(false);
       setIsEditing(false);
       setNotice("上書き保存しました");
-    } catch (e: any) {
-      setError(e?.message ?? "Failed to save");
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Failed to save");
     } finally {
       setSaving(false);
     }

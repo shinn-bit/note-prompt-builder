@@ -19,7 +19,7 @@ type HistoryDetail = {
   createdAt: string;
   title: string;
   inputs?: {
-    articleType?: ArticleType;
+    articleType?: string;
     primaryGoal?: string;
   };
   generatedPrompt?: string;
@@ -37,7 +37,12 @@ const TYPE_META: Record<
 const PER_PAGE = 10;
 
 function getType(detail?: HistoryDetail): ArticleType | undefined {
-  return detail?.inputs?.articleType;
+  const articleType = detail?.inputs?.articleType;
+  return articleType === "problem" ||
+    articleType === "experience" ||
+    articleType === "experiment"
+    ? articleType
+    : undefined;
 }
 
 export default function HistoryPage() {

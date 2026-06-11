@@ -5,7 +5,44 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import styles from "./page.module.css";
 
-type HistoryInputs = any;
+type HistoryInputs = Record<string, unknown>;
+
+type StringListMap = Record<string, string[] | undefined>;
+
+type V10Inputs = HistoryInputs & {
+  articleType?: string;
+  authority?: string;
+  materials?: {
+    problem?: StringListMap & { todayAction?: string };
+    experience?: StringListMap & {
+      feelingsOrSituation?: string[];
+      question?: string;
+      message?: string;
+    };
+    experiment?: StringListMap & { hypothesis?: string };
+  };
+  meta?: { templateId?: string };
+  optional?: StringListMap;
+  primaryGoal?: string;
+  stylePreset?: string;
+  targets?: { tags?: string[]; detail?: string };
+  theme?: string;
+};
+
+type V9Inputs = HistoryInputs & {
+  authority?: string;
+  conclusion?: string;
+  episodes?: string;
+  goal?: string;
+  keywords?: string[];
+  lengthPreset?: string;
+  ngRules?: string;
+  referenceLinks?: string[];
+  structurePlan?: string;
+  stylePreset?: string;
+  target?: string;
+  theme?: string;
+};
 
 type HistoryDetail = {
   historyId: string;
@@ -123,7 +160,7 @@ function articleTypeLabel(type: string) {
   return type || "（未設定）";
 }
 
-function renderV10Inputs(inputs: any) {
+function renderV10Inputs(inputs: V10Inputs) {
   const articleType = inputs?.articleType ?? "";
   const targets = inputs?.targets ?? {};
   const materials = inputs?.materials ?? {};
@@ -258,7 +295,7 @@ function renderV10Inputs(inputs: any) {
   );
 }
 
-function renderV9Inputs(inputs: any) {
+function renderV9Inputs(inputs: V9Inputs) {
   return (
     <SectionCard title="入力内容（v9）">
       <ReadonlyField label="記事テーマ" value={inputs?.theme ?? ""} />
@@ -324,8 +361,8 @@ export default function HistoryDetailPage() {
           );
         }
 
-        const json = await res.json();
-        const item = json?.item ?? json;
+        const json = (await res.json()) as { item?: Partial<HistoryDetail> } & Partial<HistoryDetail>;
+        const item = json.item ?? json;
 
         setData({
           historyId: item.historyId ?? historyId,
@@ -334,14 +371,20 @@ export default function HistoryDetailPage() {
           generatedPrompt: item.generatedPrompt ?? "",
           inputs: item.inputs ?? null,
         });
-      } catch (e: any) {
-        setError(e?.message ?? "Failed");
+      } catch (e: unknown) {
+        setError(e instanceof Error ? e.message : "Failed");
       }
     })();
   }, [historyId]);
 
   const inputs = data?.inputs ?? null;
-  const templateId = inputs?.meta?.templateId ?? "";
+  const templateId =
+    typeof inputs?.meta === "object" &&
+    inputs.meta !== null &&
+    "templateId" in inputs.meta &&
+    typeof inputs.meta.templateId === "string"
+      ? inputs.meta.templateId
+      : "";
   const isV10 = templateId === "note-v10" || templateId === "note-v10.0";
   const isV9 = templateId === "note-v9.0";
 
@@ -397,8 +440,8 @@ export default function HistoryDetailPage() {
                   </p>
                 </div>
 
-                {isV10 && renderV10Inputs(inputs)}
-                {isV9 && renderV9Inputs(inputs)}
+                {isV10 && renderV10Inputs(inputs as V10Inputs)}
+                {isV9 && renderV9Inputs(inputs as V9Inputs)}
 
                 {!isV10 && !isV9 && inputs && (
                   <SectionCard title="入力内容">

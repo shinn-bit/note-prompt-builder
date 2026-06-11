@@ -68,7 +68,11 @@ export async function fetchHistory(limit = 30) {
 }
 
 export async function fetchHistoryDetail(historyId: string) {
-  const res = await fetch(`${API_BASE}/history/${historyId}`, { method: "GET" });
+  const deviceId = getOrCreateDeviceId();
+  const url = new URL(`${API_BASE}/history/${historyId}`);
+  url.searchParams.set("deviceId", deviceId);
+
+  const res = await fetch(url.toString(), { method: "GET" });
 
   if (!res.ok) {
     const text = await res.text().catch(() => "");
@@ -81,7 +85,11 @@ export async function fetchHistoryDetail(historyId: string) {
       createdAt: string;
       title: string;
       deviceId: string;
-      inputs: any;
+      inputs: {
+        articleType?: string;
+        primaryGoal?: string;
+        [key: string]: unknown;
+      };
       generatedPrompt: string;
     };
   }>;

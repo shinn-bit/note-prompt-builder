@@ -109,11 +109,15 @@ export async function POST(request: Request) {
   const data = await openAiRes.json().catch(() => null);
 
   if (!openAiRes.ok) {
+    console.error("OpenAI API request failed", {
+      status: openAiRes.status,
+      data,
+    });
+
     return NextResponse.json(
       {
         error: "OpenAI API request failed",
         status: openAiRes.status,
-        details: data,
       },
       { status: openAiRes.status }
     );
@@ -129,8 +133,13 @@ export async function POST(request: Request) {
   }
 
   if (!result) {
+    console.error("Failed to parse article generation result", {
+      model,
+      data,
+    });
+
     return NextResponse.json(
-      { error: "Failed to parse article generation result", details: data },
+      { error: "Failed to parse article generation result" },
       { status: 502 }
     );
   }
